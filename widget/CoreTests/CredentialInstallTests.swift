@@ -44,6 +44,17 @@ final class CredentialInstallTests: XCTestCase {
         )
     }
 
+    func testStagedFilesAreCreatedPrivateEvenWithAnOpenUmask() throws {
+        let previous = umask(0)
+        defer { umask(previous) }
+        let url = paths.appFolder.appendingPathComponent("staged.new")
+
+        try stagePrivately(Data("secret".utf8), at: url)
+
+        XCTAssertEqual(try permissions(url), 0o600)
+        XCTAssertEqual(try permissions(paths.appFolder), 0o700)
+    }
+
     func testInstallRejectsWrongPasswordAndLeavesNothing() throws {
         let secrets = FakeSecretStore()
 

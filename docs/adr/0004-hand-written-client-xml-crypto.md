@@ -1,7 +1,7 @@
 # ADR-0004 — Hand-written KSeF client; `xml-crypto` for the XAdES signature
 
 Date: 2026-11-26
-Status: accepted
+Status: superseded by ADR-0009
 
 ## Context
 

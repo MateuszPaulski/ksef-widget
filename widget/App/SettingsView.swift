@@ -66,7 +66,7 @@ struct SettingsView: View {
                 .fixedSize()
             }
             row("Pobieraj faktury od") {
-                DatePicker("", selection: $form.startDate, displayedComponents: .date)
+                DatePicker("", selection: $form.startDate, in: ...latestStartDate, displayedComponents: .date)
                     .labelsHidden()
                     .environment(\.timeZone, warsaw)
             }
@@ -134,6 +134,9 @@ struct SettingsView: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(.background)
     }
+
+    /// The latest start date `Settings.validate` accepts: the current UTC day.
+    private var latestStartDate: Date { startDate(fromText: defaultStartDateText(now: Date())) ?? Date() }
 
     private var legacyBanner: some View {
         Text("Wykryto stare zadanie launchd „local.ksef-daily-fetch”. Dopóki jest zainstalowane, aplikacja nie pobiera faktur. Usuń je w Terminalu poleceniem scripts/launchagent.sh uninstall w katalogu repozytorium.")

@@ -128,10 +128,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func fetch(_ trigger: String) {
         Task {
-            _ = await model.gate.runIfIdle {
+            let ran = await model.gate.runIfIdle {
                 statusMenu?.refreshIcon()
                 await model.fetch(trigger: trigger)
             }
+            if !ran { logger.notice("fetch skipped trigger=\(trigger, privacy: .public) busy=true") }
             statusMenu?.refreshIcon()
         }
     }

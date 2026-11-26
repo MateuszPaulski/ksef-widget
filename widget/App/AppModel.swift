@@ -22,6 +22,7 @@ final class AppModel {
     var notificationsAllowed: Bool?
     private(set) var lastRunEnd: Date?
     private var keyPassword: String?
+    private let transport = URLSessionTransport()
 
     var settingsState: SettingsState {
         do {
@@ -52,7 +53,7 @@ final class AppModel {
     func perform(_ settings: Settings, dryRun: Bool) async throws -> RunSummary {
         let options = RunOptions(
             settings: settings, certificateURL: paths.certificate, keyURL: paths.key, keyPassword: try await password(),
-            transport: URLSessionTransport(), sleep: { try? await Task.sleep(for: .milliseconds($0)) }, now: { Date() },
+            transport: transport, sleep: { try? await Task.sleep(for: .milliseconds($0)) }, now: { Date() },
             notify: { try await Notifier.post($0, $1) }, log: { logger.notice("\($0, privacy: .public)") },
             snapshotURL: paths.snapshot, dryRun: dryRun
         )
