@@ -11,12 +11,13 @@ final class SettingsSaveTests: XCTestCase {
     private let missingInputs = "Wybierz certyfikat i klucz oraz wpisz hasło klucza."
     private var paths: AppPaths!
     private var files: TestCredentialFiles!
+    private var source: URL!
     private var dataDir: String!
 
     override func setUpWithError() throws {
         let root = try temporaryDirectory()
         paths = AppPaths(home: root.appendingPathComponent("home"))
-        let source = root.appendingPathComponent("source")
+        source = root.appendingPathComponent("source")
         try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
         files = try TestCredentials.make(nip: randomNip(), keyType: .rsa, in: source)
         dataDir = root.appendingPathComponent("invoices").path
@@ -24,13 +25,26 @@ final class SettingsSaveTests: XCTestCase {
 
     private func draft(
         nip: String = "5265877635", environment: KsefEnvironment = .prod, startDate: String = "2026-02-01",
-        withFiles: Bool = true, password: String? = nil
+        withFiles: Bool = true, password: String? = nil, using credentials: TestCredentialFiles? = nil
     ) -> SettingsDraft {
-        SettingsDraft(
+        let credentials = credentials ?? files!
+        return SettingsDraft(
             nip: nip, environment: environment, startDate: startDate, dataDir: dataDir,
-            certificate: withFiles ? files.certificateURL : nil, key: withFiles ? files.keyURL : nil,
-            password: password ?? (withFiles ? files.password : "")
+            certificate: withFiles ? credentials.certificateURL : nil, key: withFiles ? credentials.keyURL : nil,
+            password: password ?? (withFiles ? credentials.password : "")
         )
+    }
+
+    private func appFolderContents() throws -> [String] {
+        try FileManager.default.contentsOfDirectory(atPath: paths.appFolder.path).sorted()
+    }
+
+    /// A first save followed by a successful check, as the owner's installation looks before a renewal.
+    private func installedAndVerified(secrets: SecretStore) throws -> Settings {
+        var verified = try save(draft(), secrets: secrets)
+        verified.verified = true
+        try SettingsFile.save(verified, to: paths.settings)
+        return verified
     }
 
     private func save(
@@ -62,11 +76,63 @@ final class SettingsSaveTests: XCTestCase {
         XCTAssertTrue(exists(URL(fileURLWithPath: dataDir)))
     }
 
-    func testKeychainFailureIsShownAndWritesNoSettings() {
+    func testKeychainFailureOnAFirstInstallLeavesAnUnverifiedSettingsAndNoCredentials() throws {
         let text = message { _ = try save(draft(), secrets: FailingSecretStore()) }
 
         XCTAssertEqual(text, "Pęk kluczy: odmowa (OSStatus -1)")
-        XCTAssertFalse(exists(paths.settings))
+        XCTAssertEqual(try SettingsFile.load(paths.settings)?.verified, false)
+        XCTAssertEqual(try appFolderContents(), ["settings.json"])
+    }
+
+    func testAFailedKeychainWriteOnARenewalKeepsTheOldFilesAndResetsVerified() throws {
+        let secrets = FakeSecretStore()
+        let verified = try installedAndVerified(secrets: secrets)
+        let oldCertificate = try Data(contentsOf: paths.certificate)
+        let oldKey = try Data(contentsOf: paths.key)
+        let next = try TestCredentials.make(nip: randomNip(), keyType: .ec, in: source)
+
+        let text = message { _ = try save(draft(using: next), previous: verified, secrets: FailingSecretStore()) }
+
+        XCTAssertEqual(text, "Pęk kluczy: odmowa (OSStatus -1)")
+        XCTAssertEqual(try Data(contentsOf: paths.certificate), oldCertificate)
+        XCTAssertEqual(try Data(contentsOf: paths.key), oldKey)
+        XCTAssertEqual(try SettingsFile.load(paths.settings)?.verified, false)
+        XCTAssertEqual(secrets.saved, [files.password])
+        XCTAssertEqual(try appFolderContents(), ["ksef-auth.crt", "ksef-auth.key", "settings.json"])
+    }
+
+    func testAFailedStagingChangesNothing() throws {
+        let secrets = FakeSecretStore()
+        let verified = try installedAndVerified(secrets: secrets)
+        let oldCertificate = try Data(contentsOf: paths.certificate)
+        let oldKey = try Data(contentsOf: paths.key)
+        let settingsBefore = try Data(contentsOf: paths.settings)
+        let blocker = paths.appFolder.appendingPathComponent("ksef-auth.key.new")
+        try FileManager.default.createDirectory(at: blocker, withIntermediateDirectories: false)
+        let next = try TestCredentials.make(nip: randomNip(), keyType: .ec, in: source)
+
+        XCTAssertNotNil(message { _ = try save(draft(using: next), previous: verified, secrets: secrets) })
+
+        XCTAssertEqual(try Data(contentsOf: paths.certificate), oldCertificate)
+        XCTAssertEqual(try Data(contentsOf: paths.key), oldKey)
+        XCTAssertEqual(try Data(contentsOf: paths.settings), settingsBefore)
+        XCTAssertEqual(secrets.saved, [files.password])
+        XCTAssertEqual(try appFolderContents(), ["ksef-auth.crt", "ksef-auth.key", "ksef-auth.key.new", "settings.json"])
+    }
+
+    func testARenewalReplacesBothFilesAndThePasswordAndResetsVerified() throws {
+        let secrets = FakeSecretStore()
+        let verified = try installedAndVerified(secrets: secrets)
+        let next = try TestCredentials.make(nip: randomNip(), keyType: .ec, in: source)
+
+        let saved = try save(draft(using: next), previous: verified, secrets: secrets)
+
+        XCTAssertFalse(saved.verified)
+        XCTAssertEqual(try SettingsFile.load(paths.settings)?.verified, false)
+        XCTAssertEqual(try Data(contentsOf: paths.certificate), try Data(contentsOf: next.certificateURL))
+        XCTAssertEqual(try Data(contentsOf: paths.key), try Data(contentsOf: next.keyURL))
+        XCTAssertEqual(secrets.saved, [files.password, next.password])
+        XCTAssertEqual(try appFolderContents(), ["ksef-auth.crt", "ksef-auth.key", "settings.json"])
     }
 
     func testWrongPasswordWritesNothing() {

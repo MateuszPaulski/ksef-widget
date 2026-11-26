@@ -30,8 +30,13 @@ private func publicKeyBytes(of key: SigningKey) -> Data? {
 }
 
 func loadCredentials(certificateURL: URL, keyURL: URL, password: String) throws -> Credentials {
-    let certificatePem = try String(contentsOf: certificateURL, encoding: .utf8)
-    let keyPem = try String(contentsOf: keyURL, encoding: .utf8)
+    try loadCredentials(
+        certificatePem: String(contentsOf: certificateURL, encoding: .utf8), keyPem: String(contentsOf: keyURL, encoding: .utf8),
+        password: password
+    )
+}
+
+func loadCredentials(certificatePem: String, keyPem: String, password: String) throws -> Credentials {
     let key = try decryptPrivateKey(pem: keyPem, password: password)
     let certificate = try Certificate(pem: certificatePem)
     let certificateKey = SecKeyCopyExternalRepresentation(certificate.publicKey, nil) as Data?

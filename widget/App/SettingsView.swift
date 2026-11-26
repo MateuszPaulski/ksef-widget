@@ -79,6 +79,7 @@ struct SettingsView: View {
                             .help(Text(verbatim: form.dataDir))
                         Spacer(minLength: 0)
                         Button("Zmień…", action: actions.chooseFolder)
+                            .disabled(busy)
                     }
                     Text("Zmiana folderu nie przenosi plików: w nowym folderze pobieranie zacznie się od daty początkowej.")
                         .font(.caption)
@@ -160,6 +161,7 @@ struct SettingsView: View {
                 .truncationMode(.middle)
             Spacer(minLength: 0)
             Button(name == nil && !form.hasStoredCredentials ? "Wybierz…" : "Zmień…", action: choose)
+                .disabled(busy)
         }
     }
 }

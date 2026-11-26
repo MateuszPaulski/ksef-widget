@@ -145,36 +145,43 @@ final class SettingsWindowController {
             nip: form.nip.trimmingCharacters(in: .whitespaces), environment: form.environment, startDate: startDateText(form.startDate),
             dataDir: form.dataDir, certificate: certificate, key: key, password: form.password
         )
-        let paths = app.paths
-        let previous = (try? SettingsFile.load(paths.settings)) ?? nil
+        let includesCredentials = draft.certificate != nil || draft.key != nil || !draft.password.isEmpty
         model.busy = true
         Task {
-            do {
-                // The Keychain write blocks, and may wait for the owner at a prompt.
-                let saved = try await Task.detached {
-                    try saveSettings(draft, previous: previous, paths: paths, secrets: KeychainSecretStore(), today: Date())
-                }.value
-                if !draft.password.isEmpty { app.cache(password: draft.password) }
-                do {
-                    try await Notifier.requestAuthorizationIfNeeded()
-                } catch {
-                    logger.notice("notification authorization failed: \(errorMessage(error), privacy: .public)")
-                }
-                app.notificationsAllowed = await Notifier.isAuthorized()
-                resetFiles()
-                model.form.certificateName = nil
-                model.form.keyName = nil
-                model.form.password = ""
-                model.form.hasStoredCredentials = true
-                model.form.notificationsAllowed = app.notificationsAllowed
-                model.form.message = SettingsMessage(
-                    text: saved.verified ? "Zapisano." : "Zapisano. Teraz naciśnij „Sprawdź połączenie”.", isError: false
-                )
-            } catch {
-                model.form.message = SettingsMessage(text: "Błąd: \(errorMessage(error))", isError: true)
+            var message = SettingsMessage(text: "Trwa pobieranie — spróbuj za chwilę.", isError: true)
+            _ = await app.gate.runIfIdle {
+                message = await performSave(draft, model: model)
+                if includesCredentials { app.forgetPassword() }
             }
+            model.form.message = message
             model.busy = false
             didChange()
+        }
+    }
+
+    private func performSave(_ draft: SettingsDraft, model: SettingsModel) async -> SettingsMessage {
+        let paths = app.paths
+        let previous = (try? SettingsFile.load(paths.settings)) ?? nil
+        do {
+            // The Keychain write blocks, and may wait for the owner at a prompt.
+            let saved = try await Task.detached {
+                try saveSettings(draft, previous: previous, paths: paths, secrets: KeychainSecretStore(), today: Date())
+            }.value
+            do {
+                try await Notifier.requestAuthorizationIfNeeded()
+            } catch {
+                logger.notice("notification authorization failed: \(errorMessage(error), privacy: .public)")
+            }
+            app.notificationsAllowed = await Notifier.isAuthorized()
+            resetFiles()
+            model.form.certificateName = nil
+            model.form.keyName = nil
+            model.form.password = ""
+            model.form.hasStoredCredentials = true
+            model.form.notificationsAllowed = app.notificationsAllowed
+            return SettingsMessage(text: saved.verified ? "Zapisano." : "Zapisano. Teraz naciśnij „Sprawdź połączenie”.", isError: false)
+        } catch {
+            return SettingsMessage(text: "Błąd: \(errorMessage(error))", isError: true)
         }
     }
 

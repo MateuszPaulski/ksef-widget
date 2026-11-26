@@ -25,7 +25,9 @@ public struct SettingsDraft: Sendable {
     }
 }
 
-/// The save flow of the settings window. `settings.json` is written last, so any earlier failure leaves it unchanged.
+/// The save flow of the settings window. With new credentials the order is: validate the pair, create the data folder,
+/// stage the files, write `settings.json` unverified, save the password, rename the files into place. A failure at any
+/// step leaves the old credentials working and `verified` false (or unchanged when nothing was written yet).
 public func saveSettings(
     _ draft: SettingsDraft, previous: Settings?, paths: AppPaths, secrets: SecretStore, today: Date
 ) throws -> Settings {
@@ -33,23 +35,26 @@ public func saveSettings(
         nip: draft.nip, environment: draft.environment, startDate: draft.startDate, dataDir: draft.dataDir, verified: false
     )
     try settings.validate(today: today)
+    let createDataDir = { try FileManager.default.createDirectory(at: URL(fileURLWithPath: draft.dataDir), withIntermediateDirectories: true) }
 
     let enteredCredentials = draft.certificate != nil || draft.key != nil || !draft.password.isEmpty
     if enteredCredentials {
         guard let certificate = draft.certificate, let key = draft.key, !draft.password.isEmpty else {
             throw KsefError(missingCredentialInputs)
         }
-        try installCredentials(certificate: certificate, key: key, password: draft.password, paths: paths, secrets: secrets)
-    } else {
-        let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: paths.certificate.path), fileManager.fileExists(atPath: paths.key.path) else {
-            throw KsefError(missingCredentialInputs)
-        }
+        try installCredentials(
+            certificate: certificate, key: key, password: draft.password, paths: paths, secrets: secrets,
+            beforeStaging: createDataDir, beforeKeychain: { [settings] in try SettingsFile.save(settings, to: paths.settings) }
+        )
+        return settings
     }
 
-    try FileManager.default.createDirectory(at: URL(fileURLWithPath: draft.dataDir), withIntermediateDirectories: true)
-
-    if let previous, previous.verified, !enteredCredentials, previous.nip == draft.nip, previous.environment == draft.environment {
+    let fileManager = FileManager.default
+    guard fileManager.fileExists(atPath: paths.certificate.path), fileManager.fileExists(atPath: paths.key.path) else {
+        throw KsefError(missingCredentialInputs)
+    }
+    try createDataDir()
+    if let previous, previous.verified, previous.nip == draft.nip, previous.environment == draft.environment {
         settings.verified = true
     }
     try SettingsFile.save(settings, to: paths.settings)

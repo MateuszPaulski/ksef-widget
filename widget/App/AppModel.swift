@@ -35,6 +35,11 @@ final class AppModel {
         keyPassword = password
     }
 
+    /// After a credential change the Keychain, not memory, is the source of truth.
+    func forgetPassword() {
+        keyPassword = nil
+    }
+
     func password() async throws -> String {
         if let keyPassword { return keyPassword }
         // SecItemCopyMatching blocks, and may wait for the owner at a Keychain prompt.
