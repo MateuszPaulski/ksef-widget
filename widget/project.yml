@@ -20,3 +20,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: local.ksef-daily-fetch.SnapshotProbe
         CREATE_INFOPLIST_SECTION_IN_BINARY: YES   # a sandboxed CLI without an embedded CFBundleIdentifier dies with SIGTRAP
         CODE_SIGN_ENTITLEMENTS: Extension/Extension.entitlements
+  KsefWidgetTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [Tests, Shared]

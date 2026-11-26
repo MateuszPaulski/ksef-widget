@@ -1,15 +1,14 @@
 import Foundation
 
-do {
-    let data = try Data(contentsOf: SnapshotFile.url)
-    print("OK \(data.count) bytes")
+switch SnapshotFile.load() {
+case .success(let snapshot):
+    let updatedAt = snapshot.updatedAt.formatted(.iso8601)
+    print("OK status=\(snapshot.status.rawValue) invoices=\(snapshot.invoices.count) savedToday=\(snapshot.savedToday) updatedAt=\(updatedAt)")
     exit(0)
-} catch {
-    let nsError = error as NSError
-    var message = "FAILED \(error)"
-    if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
-        message += " underlying=\(underlying.domain) \(underlying.code)"
-    }
-    print(message)
+case .failure(.missing):
+    print("MISSING")
+    exit(2)
+case .failure(.unreadable(let message)):
+    print("UNREADABLE \(message)")
     exit(1)
 }
