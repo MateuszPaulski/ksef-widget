@@ -15,6 +15,6 @@ ADR-0005 signs ad hoc and commits nothing personal; the repository is public. Th
 
 ## Consequences
 
-- Ad hoc: after each rebuild the first Keychain read prompts for the login password ("Always Allow" ends it), and the Documents permission is asked again; login-item approval may need repeating. The app reads the Keychain and touches the folder at launch, so these prompts appear while the owner is at the Mac.
-- Developer ID: these answers survive rebuilds. Switching from ad hoc to Developer ID once causes one more prompt for the existing item.
+- Ad hoc (expected from Apple DTS statements, not probed): after each rebuild the first Keychain read prompts for the login password ("Always Allow" ends it), and the Documents permission is asked again; login-item approval may need repeating. The app reads the Keychain and touches the folder at launch, so these prompts appear while the owner is at the Mac. The owner's first rebuild confirms or corrects this.
+- Developer ID (expected): these answers survive rebuilds. Switching from ad hoc to Developer ID once causes one more prompt for the existing item.
 - The data protection keychain stays out of reach either way (it needs a provisioning profile).

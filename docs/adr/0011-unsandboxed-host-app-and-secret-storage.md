@@ -18,6 +18,6 @@ ADR-0005 made the widget's host app a sandboxed agent with no window, no network
 ## Consequences
 
 - No bookmarks, temporary exceptions or entitlements for the app; the only sandbox in the bundle is the extension's.
-- macOS asks once for access to the Documents folder; Keychain and Documents answers are remembered per signing identity (ADR-0012).
+- macOS is expected to ask once for access to the Documents folder; per Apple DTS, Keychain and Documents answers are remembered per signing identity (ADR-0012). Not probed on this Mac: the safety rules forbid touching the real Keychain.
 - Whoever can read the owner's login keychain and home folder can use the key, exactly as with ADR-0002's setup; revocation in Aplikacja Podatnika stays the remedy.
 - Supersedes the host-app part of ADR-0005; its widget part (native WidgetKit widget, XcodeGen, no third-party packages) stays accepted.
