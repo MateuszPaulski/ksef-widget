@@ -80,7 +80,7 @@ Authenticates and lists the first window without downloading or writing anything
 node src/main.ts
 ```
 
-Files land in `data/invoices/YYYY/MM/<ksefNumber>.xml`, `data/reports/YYYY-MM-DD.md`, `data/index.jsonl` (one line per saved invoice) and `data/state.json` (checkpoint). Exit codes: 0 complete, 2 partial, 3 failed (handled by `main.ts`, which has notified), 1 usage error or Node crashed before `main` ran (the wrapper script notifies). KSeF allows 64 single-invoice downloads per hour, so a run saves at most 60. If a large backfill ends with `Limit 60 pobrań na jedno uruchomienie.`, run it again after an hour.
+Files land in `data/invoices/YYYY/MM/<ksefNumber>.xml`, `data/reports/YYYY-MM-DD.md`, `data/index.jsonl` (one line per saved invoice) and `data/state.json` (checkpoint). Exit codes: 0 complete, 2 partial, 3 failed (handled by `main.ts`, which has notified), 1 usage error or Node crashed before `main` ran (the wrapper script notifies). KSeF allows 64 single-invoice downloads per hour, so the tool never saves more than 60 invoices in any rolling hour, counting earlier runs too (from `savedAt` in `data/index.jsonl`). If a large backfill ends with `Limit 60 pobrań na godzinę.`, run it again after an hour; hourly runs and manual runs share the same budget.
 
 ## Install the hourly job
 

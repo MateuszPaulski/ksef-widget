@@ -6,7 +6,7 @@ import type { InvoiceMetadata, MetadataPage, Window } from '../../src/ksef.ts';
 import type { Store } from '../../src/store.ts';
 import {
   KSEF_NUMBER_PATTERN,
-  MAX_DOWNLOADS_PER_RUN,
+  MAX_DOWNLOADS_PER_HOUR,
   listWindow,
   nextWindow,
   syncInvoices,
@@ -42,16 +42,19 @@ function page(invoices: InvoiceMetadata[], extra: Partial<MetadataPage> = {}): M
   return { hasMore: false, isTruncated: false, permanentStorageHwmDate: HWM, invoices, ...extra };
 }
 
-function fakeStore(initiallySaved: string[] = []) {
+function fakeStore(initiallySaved: string[] = [], now: () => Date = () => NOW, earlierSaves: Date[] = []) {
   const saved = new Set(initiallySaved);
+  const savedAt = earlierSaves.map((instant) => instant.getTime());
   const saves: string[] = [];
   const checkpoints: string[] = [];
   const store: Store = {
     checkpoint: null,
     has: (ksefNumber) => saved.has(ksefNumber),
+    savedSince: (instant) => savedAt.filter((t) => t > instant.getTime()).length,
     async saveInvoice(invoice) {
       saves.push(invoice.ksefNumber);
       saved.add(invoice.ksefNumber);
+      savedAt.push(now().getTime());
     },
     async writeCheckpoint(value) {
       checkpoints.push(value);
@@ -87,12 +90,13 @@ function harness(options: {
   query: Query;
   invoices?: Array<{ metadata: InvoiceMetadata; xml: Buffer }>;
   alreadySaved?: string[];
+  earlierSaves?: Date[];
   from?: string;
   tokenValidUntil?: (now: Date) => string;
   download?: (ksefNumber: string) => Promise<Buffer>;
 }): Harness {
   const clock = fakeClock();
-  const { store, saves, checkpoints } = fakeStore(options.alreadySaved);
+  const { store, saves, checkpoints } = fakeStore(options.alreadySaved, clock.now, options.earlierSaves);
   const xmlByNumber = new Map((options.invoices ?? []).map(({ metadata, xml }) => [metadata.ksefNumber, xml]));
   const downloads: string[] = [];
   const onSaved: string[] = [];
@@ -286,15 +290,64 @@ describe('syncInvoices', () => {
     assert.deepEqual(outcome, { status: 'partial', reason: 'Limit zapytań KSeF — trzeba odczekać 900 s.' });
   });
 
-  it('stops at the per-run download cap', async () => {
-    const all = Array.from({ length: MAX_DOWNLOADS_PER_RUN + 1 }, (_, i) => makeInvoice(i + 1));
+  it('stops at the hourly download cap', async () => {
+    const all = Array.from({ length: MAX_DOWNLOADS_PER_HOUR + 1 }, (_, i) => makeInvoice(i + 1));
     const h = harness({ query: async () => page(all.map((i) => i.metadata)), invoices: all });
 
     const outcome = await syncInvoices(h.deps);
 
-    assert.deepEqual(outcome, { status: 'partial', reason: 'Limit 60 pobrań na jedno uruchomienie.' });
+    assert.deepEqual(outcome, { status: 'partial', reason: 'Limit 60 pobrań na godzinę.' });
     assert.equal(h.saves.length, 60);
     assert.deepEqual(h.checkpoints, []);
+  });
+
+  describe('downloads of earlier runs count against the hourly cap', () => {
+    const minutesAgo = (minutes: number, count: number) =>
+      Array.from({ length: count }, () => new Date(NOW.getTime() - minutes * 60_000));
+
+    it('60 saves from 30 minutes ago stop the run before any download', async () => {
+      const a = makeInvoice(1);
+      const h = harness({ query: async () => page([a.metadata]), invoices: [a], earlierSaves: minutesAgo(30, 60) });
+
+      const outcome = await syncInvoices(h.deps);
+
+      assert.deepEqual(outcome, { status: 'partial', reason: 'Limit 60 pobrań na godzinę.' });
+      assert.deepEqual(h.downloads, []);
+      assert.deepEqual(h.checkpoints, []);
+    });
+
+    it('60 saves from 61 minutes ago do not', async () => {
+      const a = makeInvoice(1);
+      const h = harness({ query: async () => page([a.metadata]), invoices: [a], earlierSaves: minutesAgo(61, 60) });
+
+      const outcome = await syncInvoices(h.deps);
+
+      assert.deepEqual(outcome, { status: 'complete' });
+      assert.deepEqual(h.downloads, [a.metadata.ksefNumber]);
+    });
+
+    it('59 recent saves leave room for exactly one download', async () => {
+      const all = [1, 2].map((n) => makeInvoice(n));
+      const h = harness({ query: async () => page(all.map((i) => i.metadata)), invoices: all, earlierSaves: minutesAgo(30, 59) });
+
+      const outcome = await syncInvoices(h.deps);
+
+      assert.deepEqual(outcome, { status: 'partial', reason: 'Limit 60 pobrań na godzinę.' });
+      assert.deepEqual(h.downloads, [all[0]?.metadata.ksefNumber]);
+      assert.deepEqual(h.checkpoints, []);
+    });
+
+    it('saves that age out during the run free up room', async () => {
+      const all = [1, 2].map((n) => makeInvoice(n));
+      // 58 saves leave the window 2 s into the run, i.e. during the pause before the second download.
+      const earlierSaves = [...minutesAgo(59.97, 58), ...minutesAgo(10, 1)];
+      const h = harness({ query: async () => page(all.map((i) => i.metadata)), invoices: all, earlierSaves });
+
+      const outcome = await syncInvoices(h.deps);
+
+      assert.deepEqual(outcome, { status: 'complete' });
+      assert.equal(h.downloads.length, 2);
+    });
   });
 
   it('paces downloads', async () => {

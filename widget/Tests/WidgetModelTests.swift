@@ -56,7 +56,7 @@ final class WidgetModelTests: XCTestCase {
     }
 
     func testPartial() {
-        let model = make(Fixtures.snapshot(status: .partial, reason: "Limit 60 pobrań na jedno uruchomienie."))
+        let model = make(Fixtures.snapshot(status: .partial, reason: "Limit 60 pobrań na godzinę."))
         XCTAssertEqual(model.banner, banner("Pobrano częściowo — reszta przy następnym uruchomieniu.", .warning))
     }
 

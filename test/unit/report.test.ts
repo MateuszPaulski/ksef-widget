@@ -90,8 +90,8 @@ describe('formatReportSection', () => {
 
   it('omits the list when nothing was saved and shows partial and failed reasons', () => {
     assert.equal(
-      formatReportSection({ startedAt, status: 'partial', reason: 'Limit 60 pobrań na jedno uruchomienie.', saved: [] }, 'prod'),
-      '## Uruchomienie 08:00:12\n\nStatus: częściowe — Limit 60 pobrań na jedno uruchomienie.\nNowe faktury: 0',
+      formatReportSection({ startedAt, status: 'partial', reason: 'Limit 60 pobrań na godzinę.', saved: [] }, 'prod'),
+      '## Uruchomienie 08:00:12\n\nStatus: częściowe — Limit 60 pobrań na godzinę.\nNowe faktury: 0',
     );
     assert.equal(
       formatReportSection({ startedAt, status: 'failed', reason: 'Brak połączenia z KSeF: fetch failed', saved: [] }, 'prod'),
@@ -137,10 +137,10 @@ describe('formatNotification', () => {
 
   it('describes a partial run', () => {
     assert.deepEqual(
-      formatNotification({ startedAt, status: 'partial', reason: 'Limit 60 pobrań na jedno uruchomienie.', saved: many(1) }),
+      formatNotification({ startedAt, status: 'partial', reason: 'Limit 60 pobrań na godzinę.', saved: many(1) }),
       {
         title: 'KSeF: pobrano częściowo (1)',
-        message: 'Limit 60 pobrań na jedno uruchomienie. Reszta przy następnym uruchomieniu.',
+        message: 'Limit 60 pobrań na godzinę. Reszta przy następnym uruchomieniu.',
       },
     );
   });

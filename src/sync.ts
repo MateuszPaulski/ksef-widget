@@ -4,7 +4,8 @@ import type { InvoiceMetadata, MetadataPage, Window } from './ksef.ts';
 import type { Store } from './store.ts';
 
 export const MAX_WINDOW_DAYS = 90;
-export const MAX_DOWNLOADS_PER_RUN = 60;
+export const MAX_DOWNLOADS_PER_HOUR = 60;
+const HOUR_MS = 3_600_000;
 export const MIN_DOWNLOAD_INTERVAL_MS = 4_000;
 export const TOKEN_MARGIN_MS = 60_000;
 export const KSEF_NUMBER_PATTERN =
@@ -70,7 +71,6 @@ function partial(reason: string): SyncOutcome {
 export async function syncInvoices(deps: SyncDeps): Promise<SyncOutcome> {
   const { store, now, sleep } = deps;
   let from = deps.from;
-  let downloads = 0;
   let lastDownloadAt: number | null = null;
 
   try {
@@ -91,13 +91,16 @@ export async function syncInvoices(deps: SyncDeps): Promise<SyncOutcome> {
             `Nieprawidłowa data wystawienia w odpowiedzi API: ${JSON.stringify(invoice.issueDate).slice(0, 60)}`,
           );
         }
-        if (downloads === MAX_DOWNLOADS_PER_RUN) return partial(`Limit ${MAX_DOWNLOADS_PER_RUN} pobrań na jedno uruchomienie.`);
         if (Date.parse(deps.tokenValidUntil) - now().getTime() < TOKEN_MARGIN_MS) {
           return partial('Token dostępu wkrótce wygaśnie.');
         }
         if (lastDownloadAt !== null) {
           const wait = MIN_DOWNLOAD_INTERVAL_MS - (now().getTime() - lastDownloadAt);
           if (wait > 0) await sleep(wait);
+        }
+        // Counted after the pause, against the current time: KSeF's limit is a rolling hour across runs.
+        if (store.savedSince(new Date(now().getTime() - HOUR_MS)) >= MAX_DOWNLOADS_PER_HOUR) {
+          return partial(`Limit ${MAX_DOWNLOADS_PER_HOUR} pobrań na godzinę.`);
         }
         lastDownloadAt = now().getTime();
         const bytes = await deps.download(invoice.ksefNumber);
@@ -106,7 +109,6 @@ export async function syncInvoices(deps: SyncDeps): Promise<SyncOutcome> {
         }
         await store.saveInvoice(invoice, bytes);
         deps.onSaved(invoice);
-        downloads++;
       }
 
       // A closed window (backfill) must report an HWM; an open one may not have one yet.

@@ -371,6 +371,7 @@ Run: `pnpm test` → FAIL.
   export interface Store {
     readonly checkpoint: string | null;
     has(ksefNumber: string): boolean;
+    savedSince(instant: Date): number; // invoices whose index `savedAt` is after `instant`, this run's saves included
     saveInvoice(invoice: InvoiceMetadata, xml: Buffer): Promise<void>;
     writeCheckpoint(value: string): Promise<void>;
   }
@@ -382,6 +383,7 @@ Run: `pnpm test` → FAIL.
 - [ ] **Step 1: Write failing tests** (temp dirs)
 - `opening a missing dataDir creates nothing`: `checkpoint === null`, `has('x') === false`, directory still absent afterwards.
 - `saves invoice bytes and indexes them`: `issueDate '2026-11-20'` → file `invoices/2026/11/<ksefNumber>.xml` equals the Buffer; one `index.jsonl` line whose JSON has `file === 'invoices/2026/11/<ksefNumber>.xml'` and `savedAt === now().toISOString()`; `has(ksefNumber) === true`; no `*.tmp` file left in the directory.
+- `savedSince counts saves of earlier runs and of this one`: three saves at 07:00, 07:45 (separate `openStore` calls with those clocks) and 08:00 → `savedSince(06:00) === 3`, `(07:30) === 2`, `(07:45) === 1`, `(08:00) === 0`.
 - `reopening keeps the dedup set`: new `openStore` on the same dir → `has(ksefNumber) === true`.
 - `checkpoint is stored verbatim`: `writeCheckpoint('2026-11-26T07:00:00.1234567+00:00')`, reopen → identical string.
 - `a corrupt index line fails loudly`: `index.jsonl` with a valid line then `{"ksefNumber":` → `openStore` rejects with message `Uszkodzony plik index.jsonl, linia 2`.
@@ -408,7 +410,7 @@ Run: `pnpm test` → FAIL.
 - Produces:
   ```ts
   export const MAX_WINDOW_DAYS = 90;
-  export const MAX_DOWNLOADS_PER_RUN = 60;
+  export const MAX_DOWNLOADS_PER_HOUR = 60;
   export const MIN_DOWNLOAD_INTERVAL_MS = 4_000;
   export const TOKEN_MARGIN_MS = 60_000;
   export const KSEF_NUMBER_PATTERN: RegExp; // OpenAPI KsefNumber pattern, spec 5
@@ -435,12 +437,12 @@ loop:
     if store.has(invoice.ksefNumber): continue
     if !KSEF_NUMBER_PATTERN.test(invoice.ksefNumber): throw
     if !/^\d{4}-\d{2}-\d{2}$/.test(invoice.issueDate): throw
-    if downloads === MAX_DOWNLOADS_PER_RUN: return partial(cap)
     if Date.parse(tokenValidUntil) - now() < TOKEN_MARGIN_MS: return partial(token)
     sleep(MIN_DOWNLOAD_INTERVAL_MS - (now() - lastDownloadAt)) when positive
+    if store.savedSince(now() - 1 h) >= MAX_DOWNLOADS_PER_HOUR: return partial(cap)   // rolling hour across runs, evaluated per download
     bytes = download(ksefNumber)                            // RateLimitError → partial
     if sha256(bytes).base64 !== invoice.invoiceHash: throw
-    store.saveInvoice(invoice, bytes); onSaved(invoice); downloads++
+    store.saveInvoice(invoice, bytes); onSaved(invoice)
   if window.to !== undefined and hwm === null: throw        // closed window must report an HWM
   if hwm === null: return complete                          // open window: checkpoint unchanged
   next = (window.to !== undefined and Date.parse(hwm) > Date.parse(window.to)) ? window.to : hwm
@@ -451,7 +453,7 @@ loop:
 `nextWindow`: `to = new Date(Date.parse(from) + MAX_WINDOW_DAYS * 86_400_000).toISOString()` only if that instant is before `now`; otherwise no `to`. `from` is passed through unchanged.
 `listWindow`: page from `pageOffset = 0`; collect; stop when `!hasMore`; if `isTruncated`, continue with `from` = last invoice's `permanentStorageDate` and `pageOffset = 0`, else `pageOffset + 1`; dedupe by `ksefNumber` keeping first occurrence; `hwm` = last page's `permanentStorageHwmDate ?? null`. A `KsefApiError` with `status === 400` whose `body` contains `21183` → `{ invoices: [], hwm: null }`; any other error propagates.
 
-Polish texts: cap → `Limit 60 pobrań na jedno uruchomienie.`; token → `Token dostępu wkrótce wygaśnie.`; rate limit → the `RateLimitError` message; hash → `Skrót pobranej faktury ${ksefNumber} nie zgadza się z metadanymi KSeF`; pattern → `Nieprawidłowy numer KSeF w odpowiedzi API: ${JSON.stringify(ksefNumber).slice(0, 60)}`; issue date → `Nieprawidłowa data wystawienia w odpowiedzi API: ${JSON.stringify(issueDate).slice(0, 60)}`; closed-window HWM → `Nieoczekiwany permanentStorageHwmDate (${hwm}) dla okna ${from} – ${to}`.
+Polish texts: cap → `Limit 60 pobrań na godzinę.`; token → `Token dostępu wkrótce wygaśnie.`; rate limit → the `RateLimitError` message; hash → `Skrót pobranej faktury ${ksefNumber} nie zgadza się z metadanymi KSeF`; pattern → `Nieprawidłowy numer KSeF w odpowiedzi API: ${JSON.stringify(ksefNumber).slice(0, 60)}`; issue date → `Nieprawidłowa data wystawienia w odpowiedzi API: ${JSON.stringify(issueDate).slice(0, 60)}`; closed-window HWM → `Nieoczekiwany permanentStorageHwmDate (${hwm}) dla okna ${from} – ${to}`.
 
 - [ ] **Step 1: Write failing tests** (in-memory fake `Store`; fake clock where `sleep(ms)` advances `now` by `ms`; invoices built by a helper whose `invoiceHash` is the real SHA-256 of its bytes)
 - `nextWindow`: from `2026-01-01T00:00:00Z`, now `2026-11-26T08:00:00Z` → `{ from: '2026-01-01T00:00:00Z', to: '2026-04-01T00:00:00.000Z' }`; from `2026-11-01T00:00:00.1234567+00:00` → `{ from: '2026-11-01T00:00:00.1234567+00:00' }` (no `to`, `from` verbatim).
@@ -461,7 +463,8 @@ Polish texts: cap → `Limit 60 pobrań na jedno uruchomienie.`; token → `Toke
 - `saves new invoices in order and advances the checkpoint to the HWM`: store already has B; window `[A,B,C]`, hwm `H` → downloads A then C; `onSaved` A, C; `writeCheckpoint('H')` once; `complete`.
 - `walks a closed window then the open one`: from 100 days before now; first page's hwm equals the first window's `to` → first query has `to`, second has none and `from === hwm1`; checkpoint written twice, ending at `hwm2`.
 - `rate limit mid-window is partial and keeps the checkpoint`: download of the 2nd invoice rejects `RateLimitError(600)` → `{ status: 'partial', reason: 'Limit zapytań KSeF — trzeba odczekać 600 s.' }`; first invoice saved; `writeCheckpoint` never called.
-- `stops at the per-run download cap`: 61 new invoices → 60 saved, `partial` with `Limit 60 pobrań na jedno uruchomienie.`, no checkpoint write.
+- `stops at the hourly download cap`: 61 new invoices → 60 saved, `partial` with `Limit 60 pobrań na godzinę.`, no checkpoint write.
+- `earlier saves count against the hourly cap` (fake store whose `savedSince` counts earlier `savedAt` values plus this run's saves): 60 saves from 30 minutes ago + 1 new → no download, `partial`; 60 from 61 minutes ago + 1 new → downloads; 59 recent + 2 new → one download, then `partial`; saves that age out mid-run free up room.
 - `paces downloads`: 3 downloads with instant fake downloads → `sleep` called with `4000` twice.
 - `token about to expire ends the run`: `tokenValidUntil` = now + 30 s → `partial` with `Token dostępu wkrótce wygaśnie.`, nothing downloaded.
 - `hash mismatch fails`: wrong `invoiceHash` → rejects with the hash message; `saveInvoice` not called.

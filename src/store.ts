@@ -5,6 +5,7 @@ import type { InvoiceMetadata } from './ksef.ts';
 export interface Store {
   readonly checkpoint: string | null;
   has(ksefNumber: string): boolean;
+  savedSince(instant: Date): number;
   saveInvoice(invoice: InvoiceMetadata, xml: Buffer): Promise<void>;
   writeCheckpoint(value: string): Promise<void>;
 }
@@ -71,13 +72,16 @@ export async function openStore(dataDir: string, now: () => Date): Promise<Store
     checkpoint = value;
   }
 
-  const saved = new Set((await readIndex(dataDir)).map((entry) => entry.ksefNumber));
+  const entries = await readIndex(dataDir);
+  const saved = new Set(entries.map((entry) => entry.ksefNumber));
+  const savedAt = entries.map((entry) => Date.parse(entry.savedAt));
 
   return {
     get checkpoint() {
       return checkpoint;
     },
     has: (ksefNumber) => saved.has(ksefNumber),
+    savedSince: (instant) => savedAt.filter((t) => t > instant.getTime()).length,
     async saveInvoice(invoice, xml) {
       const [year, month] = invoice.issueDate.split('-');
       const file = `invoices/${year}/${month}/${invoice.ksefNumber}.xml`;
@@ -97,6 +101,7 @@ export async function openStore(dataDir: string, now: () => Date): Promise<Store
       };
       await appendFile(join(dataDir, 'index.jsonl'), `${JSON.stringify(line)}\n`);
       saved.add(invoice.ksefNumber);
+      savedAt.push(Date.parse(line.savedAt));
     },
     async writeCheckpoint(value) {
       await writeAtomic(join(dataDir, 'state.json'), `${JSON.stringify({ checkpoint: value })}\n`);

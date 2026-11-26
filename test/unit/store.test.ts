@@ -92,6 +92,20 @@ describe('store', () => {
     assert.equal(reopened.has('other'), false);
   });
 
+  it('savedSince counts saves of earlier runs and of this one', async () => {
+    const at = (time: string) => () => new Date(`2026-11-26T${time}Z`);
+    await (await openStore(dataDir, at('07:00:00'))).saveInvoice(invoice, Buffer.from('x'));
+    await (await openStore(dataDir, at('07:45:00'))).saveInvoice({ ...invoice, ksefNumber: 'second' }, Buffer.from('y'));
+
+    const store = await openStore(dataDir, at('08:00:00'));
+    await store.saveInvoice({ ...invoice, ksefNumber: 'third' }, Buffer.from('z'));
+
+    assert.equal(store.savedSince(new Date('2026-11-26T06:00:00Z')), 3);
+    assert.equal(store.savedSince(new Date('2026-11-26T07:30:00Z')), 2);
+    assert.equal(store.savedSince(new Date('2026-11-26T07:45:00Z')), 1);
+    assert.equal(store.savedSince(new Date('2026-11-26T08:00:00Z')), 0);
+  });
+
   it('stores the checkpoint verbatim', async () => {
     const store = await openStore(dataDir, () => NOW);
     await store.writeCheckpoint('2026-11-26T07:00:00.1234567+00:00');
