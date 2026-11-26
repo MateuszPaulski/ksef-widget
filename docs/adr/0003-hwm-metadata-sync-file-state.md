@@ -10,7 +10,7 @@ KSeF offers two ways to pull invoices: the synchronous metadata query (`POST /in
 ## Decision
 
 - Query metadata with `subjectType=Subject2`, `dateType=PermanentStorage`, `sortOrder=Asc`, `restrictToPermanentStorageHwmDate=true`, in windows of at most 90 days; handle `hasMore` / `isTruncated` as documented; download each new invoice singly.
-- Keep state in plain files under a configurable data directory: `state.json` with the checkpoint (the last fully processed window's HWM, stored as the exact server string), an append-only `index.jsonl` of saved invoices keyed by KSeF number that doubles as the dedup set, the XMLs under `invoices/YYYY/MM/<ksefNumber>.xml`, and daily Markdown reports.
+- Keep state in plain files under a configurable data directory: `state.json` with the checkpoint (the last fully processed window's HWM as the exact server string, or the window's own `to` when KSeF reports an HWM beyond it), an append-only `index.jsonl` of saved invoices keyed by KSeF number that doubles as the dedup set, the XMLs under `invoices/YYYY/MM/<ksefNumber>.xml`, and daily Markdown reports.
 - The checkpoint advances only when every invoice of a window is on disk. A run cut short leaves it unchanged; the next run re-lists the window and the index skips saved invoices.
 
 ## Consequences
