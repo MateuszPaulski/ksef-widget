@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import type { IndexEntry } from '../../src/store.ts';
-import { buildSnapshot, widgetInvoice, writeSnapshot } from '../../src/snapshot.ts';
+import { buildSnapshot, readPreviousFailure, widgetInvoice, writeSnapshot } from '../../src/snapshot.ts';
 
 function entry(n: number, savedAt: string, sellerName: string | null = `Sprzedawca ${n}`): IndexEntry {
   return {
@@ -92,5 +92,22 @@ describe('snapshot', () => {
 
     assert.equal(await readFile(path, 'utf8'), `${JSON.stringify(snapshot, null, 2)}\n`);
     assert.deepEqual(await readdir(join(root, 'a', 'b')), ['widget.json']);
+  });
+
+  it('readPreviousFailure returns the reason and day of a failed snapshot', async () => {
+    const path = join(root, 'failed.json');
+    await writeSnapshot(path, buildSnapshot({ status: 'failed', reason: 'x' }, [], new Date('2026-11-26T13:00:00.000Z')));
+    assert.deepEqual(await readPreviousFailure(path), { reason: 'x', today: '2026-11-26' });
+  });
+
+  it('readPreviousFailure is null unless the file is a failed snapshot', async () => {
+    const path = join(root, 'other.json');
+    assert.equal(await readPreviousFailure(path), null);
+    await writeSnapshot(path, buildSnapshot({ status: 'partial', reason: 'x' }, [], new Date('2026-11-26T13:00:00.000Z')));
+    assert.equal(await readPreviousFailure(path), null);
+    for (const text of ['{"status":"failed"', 'null', '"failed"', '{"status":"failed","today":"2026-11-26"}', '{"status":"failed","reason":"x"}']) {
+      await writeFile(path, text);
+      assert.equal(await readPreviousFailure(path), null, text);
+    }
   });
 });

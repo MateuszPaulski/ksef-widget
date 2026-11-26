@@ -5,7 +5,7 @@ import { createHttp } from './http.ts';
 import { authenticate, downloadInvoice, queryMetadata, type InvoiceMetadata } from './ksef.ts';
 import type { Notifier } from './notify.ts';
 import { formatNotification, formatReportSection, warsawDay, type RunSummary } from './report.ts';
-import { buildSnapshot, widgetInvoice, writeSnapshot, type WidgetInvoice } from './snapshot.ts';
+import { buildSnapshot, readPreviousFailure, widgetInvoice, writeSnapshot, type WidgetInvoice } from './snapshot.ts';
 import { appendReport, openStore, readIndex } from './store.ts';
 import { listWindow, nextWindow, syncInvoices, type Query } from './sync.ts';
 
@@ -66,13 +66,23 @@ export async function run(options: RunOptions): Promise<RunSummary> {
 
   if (options.dryRun) return summary;
 
+  // A lasting failure would otherwise notify at every hourly run: stay quiet when the snapshot on disk already
+  // holds the same failure from today. New invoices saved by this run are always announced.
+  const finishedAt = now();
+  let repeatedFailure = false;
+  if (summary.status === 'failed' && summary.saved.length === 0) {
+    const previous = await readPreviousFailure(options.snapshotPath);
+    repeatedFailure = previous !== null && previous.reason === summary.reason && previous.today === warsawDay(finishedAt);
+  }
+
   if (summary.status !== 'complete' || summary.saved.length > 0) {
     try {
       await appendReport(config.dataDir, warsawDay(startedAt), formatReportSection(summary, config.environment));
     } catch (err) {
       log(`could not write the report: ${errorMessage(err)}`);
     }
-    const notification = formatNotification(summary);
+    const notification = repeatedFailure ? null : formatNotification(summary);
+    if (repeatedFailure) log('repeated failure, notification skipped');
     if (notification !== null) {
       try {
         await options.notify(notification.title, notification.message);
@@ -89,7 +99,7 @@ export async function run(options: RunOptions): Promise<RunSummary> {
     log(`could not read the index for the widget: ${errorMessage(err)}`);
   }
   try {
-    await writeSnapshot(options.snapshotPath, buildSnapshot(summary, invoices, now()));
+    await writeSnapshot(options.snapshotPath, buildSnapshot(summary, invoices, finishedAt));
   } catch (err) {
     log(`could not write the widget snapshot: ${errorMessage(err)}`);
   }

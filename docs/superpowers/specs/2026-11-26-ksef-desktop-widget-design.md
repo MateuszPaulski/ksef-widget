@@ -23,7 +23,7 @@ Clicking an invoice opens its KSeF view link (the "KOD I" link the report alread
 ## 2. Goals
 
 1. A native WidgetKit desktop widget in medium and large sizes listing the newest saved invoices (seller, gross amount with currency, issue date), the time of the last fetch, and how many invoices were saved today (Europe/Warsaw).
-2. The fetcher runs hourly within KSeF rate limits; notifications keep their current rules (only when something is new, partial or failed).
+2. The fetcher runs hourly within KSeF rate limits; notifications keep their current rules (only when something is new, partial or failed), except that a failure repeating the previous run's failure on the same day does not notify again (7.3, amendment W1).
 3. After every non-dry run, complete, partial or failed, the fetcher writes a snapshot file the widget renders.
 4. The widget makes a failed last run, a stale snapshot and a missing or unreadable snapshot visible.
 5. Clicking a row opens that invoice's KSeF view link in the default browser.
@@ -157,7 +157,7 @@ All checked on 2026-11-26 on the owner's Mac (macOS 27.0.1, Apple Silicon, Xcode
 - (O) LaunchAgent: `StartCalendarInterval` `{Minute: 0}` instead of `{Hour: 8, Minute: 0}`. Label `local.ksef-daily-fetch`, script names and log file stay: "daily-fetch" is the project's name, and a new label would leave an old installed job running next to the new one. The install message says it runs every hour.
 - (S) Rate budget per idle run: one challenge, one XAdES upload, about two status polls, one redeem, one metadata query. Hourly that is 1 metadata query of 20/h and about 4 other calls of 120/h. A backfill run downloads at most 60 (4 s apart), so two back-to-back hourly backfill runs stay near 60 downloads in any sliding hour, under 64; a 429 ends the run as partial (fetcher spec 7.4). Hourly is four times above KSeF's 15-minute floor.
 - (S) Reports: unchanged. Nothing-new runs write nothing; other runs append a section to `reports/YYYY-MM-DD.md`, so a day can now hold several sections.
-- (S) Notifications: unchanged rules. Consequence the owner should know: a persistent failure (offline Mac, expired certificate) now notifies every hour instead of once a day, and a backfill notifies "pobrano częściowo" each hour until done. Kept, because suppressing repeats needs state and risks a silent failure when the widget is not on screen. Question for the owner (8).
+- (S) Notifications: same rules, with one amendment (W1, orchestrator's call (O), overrules the first draft of this spec, which kept every hourly repeat). A `failed` run does not notify when the snapshot on disk, read before the new one is written, is also `failed` with the identical `reason` and its `today` equals the current Europe/Warsaw day. The first failure of each day, a different reason, a failure after any non-failed run, or a missing or malformed previous snapshot still notify; so does a failed run that saved new invoices. Report sections, the snapshot and a log line (`repeated failure, notification skipped`) are written as before; `partial` and "new invoices" notifications and dry runs are unchanged. `main.ts` applies the same rule before its pre-config failure notification. Consequence: a lasting failure notifies once a day, not every hour; a backfill still notifies "pobrano częściowo" at each hourly run until done. Suppression is safe against a silent failure because the snapshot, the widget banner (7.4) and the report still show every failed run.
 - (S) `report.ts`: `sellerLabel` becomes exported; `sellerLabel` and `invoiceViewUrl` take only the fields they read (`Pick<InvoiceMetadata, …>`), so index entries can be passed. `store.ts`: an exported `IndexEntry` type and `readIndex(dataDir)`, used by `openStore` for the dedup set; `writeAtomic` becomes exported. New `src/snapshot.ts`.
 
 ### 7.4 Widget content and copy
@@ -193,7 +193,7 @@ All checked on 2026-11-26 on the owner's Mac (macOS 27.0.1, Apple Silicon, Xcode
 - **UNCONFIRMED** that a widget click reaches `application(_:open:)` the way `open -a` does. Check: the owner clicks a row and `log show --predicate 'subsystem == "local.ksef-daily-fetch.widget"' --last 5m` shows the URL line.
 - **UNCONFIRMED** macOS widget point sizes; renders are a layout check. The owner judges the real look.
 - **UNCONFIRMED** deployment target 14.0: the prototype was built with 15.0. If an API used needs more, raise the target to the lowest that builds and say so.
-- **Question for the owner:** hourly repeats of the same failure notification (7.3). Today: kept.
+- Resolved by the orchestrator (O, W1), not yet confirmed by the owner: a repeated identical failure notifies once per Warsaw day, not every hour (7.3).
 - Pre-existing: the README's example notification shows `1 230,00 PLN`, but Node prints `1230,00 PLN`. The README edit in this feature corrects that one example.
 - Probe leftovers outside the scratch directory: sandbox containers `~/Library/Containers/local.probe.ksef*` (nine) and two crash reports `~/Library/Logs/DiagnosticReports/reader-*.ips`. They are inert; the owner may delete them.
 

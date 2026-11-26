@@ -17,5 +17,5 @@ ADR-0001 runs the fetcher from a per-user LaunchAgent "daily around 08:00". With
 
 - New invoices reach the snapshot, notification and report within about an hour of KSeF settling them, instead of up to a day.
 - Steady state uses 1 of 20 metadata queries and about 4 of 120 other calls per hour; a backfill still caps at 60 downloads per run, under 64 in any hour, with 429 handled as a partial run.
-- A persistent failure (offline Mac, revoked certificate) now notifies every hour, and a large backfill notifies "pobrano częściowo" every hour until done. The daily report file can hold several sections.
+- A persistent failure (offline Mac, revoked certificate) notifies once per Warsaw day: a failed run with the same reason as the previous failed snapshot from the same day skips the notification (the report section and snapshot are still written). A large backfill notifies "pobrano częściowo" at every hourly run until done. The daily report file can hold several sections.
 - The owner must re-run `scripts/launchagent.sh install` to switch an installed job to the new schedule.

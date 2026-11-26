@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import type { Environment } from './environments.ts';
 import { formatAmount, invoiceViewUrl, sellerLabel, warsawDay, type RunSummary } from './report.ts';
 import { writeAtomic, type IndexEntry } from './store.ts';
@@ -54,4 +55,16 @@ export function buildSnapshot(summary: Pick<RunSummary, 'status' | 'reason'>, in
 
 export async function writeSnapshot(path: string, snapshot: WidgetSnapshot): Promise<void> {
   await writeAtomic(path, `${JSON.stringify(snapshot, null, 2)}\n`);
+}
+
+// A missing, unreadable or malformed file counts as "no previous failure".
+export async function readPreviousFailure(path: string): Promise<{ reason: string; today: string } | null> {
+  try {
+    const parsed: unknown = JSON.parse(await readFile(path, 'utf8'));
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const { status, reason, today } = parsed as Record<string, unknown>;
+    return status === 'failed' && typeof reason === 'string' && typeof today === 'string' ? { reason, today } : null;
+  } catch {
+    return null;
+  }
 }

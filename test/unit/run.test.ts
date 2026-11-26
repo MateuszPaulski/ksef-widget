@@ -300,6 +300,82 @@ describe('run', () => {
     assert.ok(logs.some((line) => line.includes('could not read the index for the widget')));
   });
 
+  describe('repeated failures', () => {
+    const offline = { invoices: [], fetchError: new TypeError('fetch failed') };
+    const reportSections = async (dataDir: string, day = warsawDay(START)) =>
+      ((await readFile(join(dataDir, 'reports', `${day}.md`), 'utf8')).match(/^## Uruchomienie/gm) ?? []).length;
+
+    it('the same failure twice on one day notifies once and reports twice', async () => {
+      const { options, dataDir, snapshotPath, notifications, logs } = setup(offline);
+
+      await run(options);
+      await run(options);
+
+      assert.equal(notifications.length, 1);
+      assert.equal(await reportSections(dataDir), 2);
+      assert.equal((await readSnapshot(snapshotPath)).status, 'failed');
+      assert.equal(logs.filter((line) => line.includes('repeated failure, notification skipped')).length, 1);
+    });
+
+    it('the same failure on the next Warsaw day notifies again', async () => {
+      const { options, notifications } = setup(offline);
+
+      await run(options);
+      // 00:30 in Warsaw but still 2026-11-26 in UTC: the comparison must use the Warsaw day.
+      await run({ ...options, now: () => new Date('2026-11-26T23:30:00Z') });
+
+      assert.equal(notifications.length, 2);
+    });
+
+    it('a different reason notifies', async () => {
+      const first = setup(offline);
+      const second = setup({ invoices: [], fetchError: new TypeError('other') });
+
+      await run(first.options);
+      await run({ ...second.options, snapshotPath: first.snapshotPath });
+
+      assert.equal(first.notifications.length, 1);
+      assert.equal(second.notifications.length, 1);
+    });
+
+    it('a failure after a complete run notifies again', async () => {
+      const first = setup(offline);
+      const complete = setup({ invoices: [] });
+      const third = setup(offline);
+
+      await run(first.options);
+      await run({ ...complete.options, snapshotPath: first.snapshotPath });
+      await run({ ...third.options, snapshotPath: first.snapshotPath });
+
+      assert.equal(first.notifications.length, 1);
+      assert.equal(third.notifications.length, 1);
+    });
+
+    it('a garbled previous snapshot notifies', async () => {
+      const { options, snapshotPath, notifications } = setup(offline);
+      await writeFile(snapshotPath, '{"status":"failed"');
+
+      await run(options);
+
+      assert.equal(notifications.length, 1);
+      assert.equal((await readSnapshot(snapshotPath)).status, 'failed');
+    });
+
+    it('a repeated failure that saved new invoices still notifies', async () => {
+      const invoices = [fakeInvoice(1), fakeInvoice(2)];
+      const failing = { invoices, downloadStatus: (n: string) => (n === invoices[1]?.metadata.ksefNumber ? { status: 500 } : undefined) };
+      const first = setup(failing);
+      const second = setup(failing);
+
+      await run(first.options);
+      await run({ ...second.options, snapshotPath: first.snapshotPath });
+
+      assert.equal(first.notifications.length, 1);
+      assert.equal(second.notifications.length, 1);
+      assert.ok(second.notifications[0]?.message.endsWith(' Zapisano wcześniej: 1.'));
+    });
+  });
+
   it('survives a failing notifier', async () => {
     const { options, logs } = setup(
       { invoices: [fakeInvoice(1)] },

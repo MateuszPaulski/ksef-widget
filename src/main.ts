@@ -3,8 +3,9 @@ import { join, resolve } from 'node:path';
 import { loadConfig } from './config.ts';
 import { readKeyPassword } from './credentials.ts';
 import { createOsascriptNotifier } from './notify.ts';
+import { warsawDay } from './report.ts';
 import { run } from './run.ts';
-import { buildSnapshot, writeSnapshot } from './snapshot.ts';
+import { buildSnapshot, readPreviousFailure, writeSnapshot } from './snapshot.ts';
 
 const SNAPSHOT_PATH = join(homedir(), 'Library', 'Application Support', 'ksef-daily-fetch', 'widget.json');
 const USAGE = 'Usage: node src/main.ts [--dry-run | --test-notification]';
@@ -40,10 +41,16 @@ async function main(args: string[]): Promise<number> {
     const message = errorMessage(err);
     console.error(message);
     if (!dryRun) {
-      try {
-        await notify('KSeF: błąd pobierania faktur', message);
-      } catch (notifyErr) {
-        console.error(`could not show the notification: ${errorMessage(notifyErr)}`);
+      // Same rule as in run(): do not repeat a failure notification that was already shown today.
+      const previous = await readPreviousFailure(SNAPSHOT_PATH);
+      if (previous !== null && previous.reason === message && previous.today === warsawDay(new Date())) {
+        console.error('repeated failure, notification skipped');
+      } else {
+        try {
+          await notify('KSeF: błąd pobierania faktur', message);
+        } catch (notifyErr) {
+          console.error(`could not show the notification: ${errorMessage(notifyErr)}`);
+        }
       }
       try {
         await writeSnapshot(SNAPSHOT_PATH, buildSnapshot({ status: 'failed', reason: message }, [], new Date()));
