@@ -43,7 +43,7 @@ async function main(args: string[]): Promise<number> {
     if (!dryRun) {
       // Same rule as in run(): do not repeat a failure notification that was already shown today.
       const previous = await readPreviousFailure(SNAPSHOT_PATH);
-      if (previous !== null && previous.reason === message && previous.today === warsawDay(new Date())) {
+      if (previous !== null && previous.failureKey === message && previous.today === warsawDay(new Date())) {
         console.error('repeated failure, notification skipped');
       } else {
         try {
@@ -53,7 +53,7 @@ async function main(args: string[]): Promise<number> {
         }
       }
       try {
-        await writeSnapshot(SNAPSHOT_PATH, buildSnapshot({ status: 'failed', reason: message }, [], new Date()));
+        await writeSnapshot(SNAPSHOT_PATH, buildSnapshot({ status: 'failed', reason: message, failureKey: message }, [], new Date()));
       } catch (snapshotErr) {
         console.error(`could not write the widget snapshot: ${errorMessage(snapshotErr)}`);
       }

@@ -94,10 +94,16 @@ describe('snapshot', () => {
     assert.deepEqual(await readdir(join(root, 'a', 'b')), ['widget.json']);
   });
 
-  it('readPreviousFailure returns the reason and day of a failed snapshot', async () => {
+  it('buildSnapshot writes failureKey only when given', () => {
+    const now = new Date('2026-11-26T13:00:00.000Z');
+    assert.equal(buildSnapshot({ status: 'failed', reason: 'long text', failureKey: 'KSeF 500' }, [], now).failureKey, 'KSeF 500');
+    assert.equal('failureKey' in buildSnapshot({ status: 'partial', reason: 'x' }, [], now), false);
+  });
+
+  it('readPreviousFailure returns the failure key and day of a failed snapshot', async () => {
     const path = join(root, 'failed.json');
-    await writeSnapshot(path, buildSnapshot({ status: 'failed', reason: 'x' }, [], new Date('2026-11-26T13:00:00.000Z')));
-    assert.deepEqual(await readPreviousFailure(path), { reason: 'x', today: '2026-11-26' });
+    await writeSnapshot(path, buildSnapshot({ status: 'failed', reason: 'long text', failureKey: 'KSeF 500' }, [], new Date('2026-11-26T13:00:00.000Z')));
+    assert.deepEqual(await readPreviousFailure(path), { failureKey: 'KSeF 500', today: '2026-11-26' });
   });
 
   it('readPreviousFailure is null unless the file is a failed snapshot', async () => {
@@ -105,7 +111,7 @@ describe('snapshot', () => {
     assert.equal(await readPreviousFailure(path), null);
     await writeSnapshot(path, buildSnapshot({ status: 'partial', reason: 'x' }, [], new Date('2026-11-26T13:00:00.000Z')));
     assert.equal(await readPreviousFailure(path), null);
-    for (const text of ['{"status":"failed"', 'null', '"failed"', '{"status":"failed","today":"2026-11-26"}', '{"status":"failed","reason":"x"}']) {
+    for (const text of ['{"status":"failed"', 'null', '"failed"', '{"status":"failed","today":"2026-11-26"}', '{"status":"failed","failureKey":"x"}', '{"status":"failed","reason":"x","today":"2026-11-26"}']) {
       await writeFile(path, text);
       assert.equal(await readPreviousFailure(path), null, text);
     }

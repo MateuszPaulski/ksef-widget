@@ -1,7 +1,7 @@
 import type { Config } from './config.ts';
 import { loadCredentials } from './credentials.ts';
 import { ENVIRONMENTS } from './environments.ts';
-import { createHttp } from './http.ts';
+import { KsefApiError, createHttp } from './http.ts';
 import { authenticate, downloadInvoice, queryMetadata, type InvoiceMetadata } from './ksef.ts';
 import type { Notifier } from './notify.ts';
 import { formatNotification, formatReportSection, warsawDay, type RunSummary } from './report.ts';
@@ -61,7 +61,9 @@ export async function run(options: RunOptions): Promise<RunSummary> {
         ? { startedAt, status: 'complete', saved }
         : { startedAt, status: 'partial', reason: outcome.reason, saved };
   } catch (err) {
-    summary = { startedAt, status: 'failed', reason: errorMessage(err), saved };
+    // An API error message embeds volatile response text; the status alone identifies the failure.
+    const failureKey = err instanceof KsefApiError ? `KSeF ${err.status}` : errorMessage(err);
+    summary = { startedAt, status: 'failed', reason: errorMessage(err), failureKey, saved };
   }
 
   if (options.dryRun) return summary;
@@ -72,7 +74,7 @@ export async function run(options: RunOptions): Promise<RunSummary> {
   let repeatedFailure = false;
   if (summary.status === 'failed' && summary.saved.length === 0) {
     const previous = await readPreviousFailure(options.snapshotPath);
-    repeatedFailure = previous !== null && previous.reason === summary.reason && previous.today === warsawDay(finishedAt);
+    repeatedFailure = previous !== null && previous.failureKey === summary.failureKey && previous.today === warsawDay(finishedAt);
   }
 
   if (summary.status !== 'complete' || summary.saved.length > 0) {

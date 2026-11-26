@@ -31,7 +31,7 @@
 3. **No snapshot, a half-garbled one, or one with an unknown status** (fetcher never ran, file edited by hand): the widget shows the pinned banner, never an empty or crashed widget. Tests in Task 5.
 4. **The Mac slept all night or the LaunchAgent is not installed**: the widget must turn to "Dane nieaktualne" after three hours and drop yesterday's "dziś" count after Warsaw midnight even when macOS does not reload it. Tests in Task 5 (`timelineDates`, stale threshold, today check).
 5. **A run that fails before or during sync** (wrong key password, corrupt `index.jsonl`, config missing): a snapshot with `status: "failed"` and the Polish reason is still written; a dry run writes nothing. Tests in Task 3.
-6. **Amendment W1 (orchestrator's call, applied after Task 3 as its own commit `feat: notify a repeated failure once a day`; overrides this plan and the spec):** a `failed` run does not notify when the previous snapshot on disk is also `failed`, has the identical `reason` and its `today` equals the current Europe/Warsaw day (read before the new snapshot is written; a missing or malformed one counts as no previous failure). Implemented in `run()` and in the pre-config path of `src/main.ts`, with `readPreviousFailure` in `src/snapshot.ts`; a failed run that saved new invoices still notifies. Logged as `repeated failure, notification skipped`.
+6. **Amendment W1 (orchestrator's call, applied after Task 3 as its own commit `feat: notify a repeated failure once a day`; overrides this plan and the spec):** a `failed` run does not notify when the previous snapshot on disk is also `failed`, has the same `failureKey` (`KSeF <status>` for an API error, else the message; added by a later fix because the response text in `reason` differs on every request) and its `today` equals the current Europe/Warsaw day (read before the new snapshot is written; a missing, malformed or `failureKey`-less one counts as no previous failure). Implemented in `run()` and in the pre-config path of `src/main.ts`, with `readPreviousFailure` in `src/snapshot.ts`; a failed run that saved new invoices still notifies. Logged as `repeated failure, notification skipped`.
 
 ---
 
@@ -78,6 +78,7 @@ export interface WidgetInvoice {
 }
 export interface WidgetSnapshot {
   updatedAt: string; status: 'complete' | 'partial' | 'failed'; reason?: string;
+  failureKey?: string; // only on failed snapshots; the widget ignores it
   today: string; savedToday: number; invoices: WidgetInvoice[];
 }
 ```

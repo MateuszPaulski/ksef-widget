@@ -19,6 +19,7 @@ export interface WidgetSnapshot {
   updatedAt: string;
   status: 'complete' | 'partial' | 'failed';
   reason?: string;
+  failureKey?: string;
   today: string;
   savedToday: number;
   invoices: WidgetInvoice[];
@@ -41,12 +42,13 @@ export function widgetInvoice(entry: IndexEntry, environment: Environment): Widg
 }
 
 // `invoices` are in index order, oldest first.
-export function buildSnapshot(summary: Pick<RunSummary, 'status' | 'reason'>, invoices: WidgetInvoice[], now: Date): WidgetSnapshot {
+export function buildSnapshot(summary: Pick<RunSummary, 'status' | 'reason' | 'failureKey'>, invoices: WidgetInvoice[], now: Date): WidgetSnapshot {
   const today = warsawDay(now);
   return {
     updatedAt: now.toISOString(),
     status: summary.status,
     ...(summary.reason === undefined ? {} : { reason: summary.reason }),
+    ...(summary.failureKey === undefined ? {} : { failureKey: summary.failureKey }),
     today,
     savedToday: invoices.filter((invoice) => warsawDay(new Date(invoice.savedAt)) === today).length,
     invoices: invoices.slice(-SNAPSHOT_INVOICES).reverse(),
@@ -57,13 +59,13 @@ export async function writeSnapshot(path: string, snapshot: WidgetSnapshot): Pro
   await writeAtomic(path, `${JSON.stringify(snapshot, null, 2)}\n`);
 }
 
-// A missing, unreadable or malformed file counts as "no previous failure".
-export async function readPreviousFailure(path: string): Promise<{ reason: string; today: string } | null> {
+// A missing, unreadable or malformed file, or one without a `failureKey`, counts as "no previous failure".
+export async function readPreviousFailure(path: string): Promise<{ failureKey: string; today: string } | null> {
   try {
     const parsed: unknown = JSON.parse(await readFile(path, 'utf8'));
     if (typeof parsed !== 'object' || parsed === null) return null;
-    const { status, reason, today } = parsed as Record<string, unknown>;
-    return status === 'failed' && typeof reason === 'string' && typeof today === 'string' ? { reason, today } : null;
+    const { status, failureKey, today } = parsed as Record<string, unknown>;
+    return status === 'failed' && typeof failureKey === 'string' && typeof today === 'string' ? { failureKey, today } : null;
   } catch {
     return null;
   }

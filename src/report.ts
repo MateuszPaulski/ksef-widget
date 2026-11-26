@@ -5,6 +5,8 @@ export interface RunSummary {
   startedAt: Date;
   status: 'complete' | 'partial' | 'failed';
   reason?: string;
+  // Stable identity of a failure, for "same failure again" checks; `reason` is display text and may be volatile.
+  failureKey?: string;
   saved: InvoiceMetadata[];
 }
 

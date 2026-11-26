@@ -33,7 +33,7 @@ export interface FakeKsefOptions {
   hwm: string;
   now: () => Date; // the test's fake clock; token validUntil is derived from it
   authStatus?: { code: number; description: string; details?: string[] };
-  downloadStatus?: (ksefNumber: string) => { status: number; headers?: Record<string, string> } | undefined;
+  downloadStatus?: (ksefNumber: string) => { status: number; headers?: Record<string, string>; body?: string } | undefined;
   fetchError?: Error; // every request throws this
 }
 
@@ -89,7 +89,7 @@ export function createFakeKsef(options: FakeKsefOptions): {
     if (method === 'GET' && path.startsWith('/invoices/ksef/')) {
       const ksefNumber = path.slice('/invoices/ksef/'.length);
       const override = options.downloadStatus?.(ksefNumber);
-      if (override !== undefined) return new Response('', { status: override.status, headers: override.headers });
+      if (override !== undefined) return new Response(override.body ?? '', { status: override.status, headers: override.headers });
       const invoice = options.invoices.find((candidate) => candidate.metadata.ksefNumber === ksefNumber);
       if (invoice === undefined) return new Response('', { status: 404 });
       return new Response(new Uint8Array(invoice.xml), { status: 200, headers: { 'content-type': 'application/xml' } });

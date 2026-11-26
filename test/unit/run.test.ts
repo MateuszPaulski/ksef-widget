@@ -327,6 +327,45 @@ describe('run', () => {
       assert.equal(notifications.length, 2);
     });
 
+    describe('API failures are compared by status, not by response text', () => {
+      const invoice = fakeInvoice(1);
+      const failingWith = (status: number, body: string) => ({ invoices: [invoice], downloadStatus: () => ({ status, body }) });
+
+      it('two 500 responses that differ only in a timestamp and reference notify once', async () => {
+        const first = setup(failingWith(500, '{"timestamp":"2026-11-26T07:00:01Z","referenceNumber":"20261126-EE-AAAAAAAAAA-0000000001-01"}'));
+        const second = setup(failingWith(500, '{"timestamp":"2026-11-26T08:00:03Z","referenceNumber":"20261126-EE-BBBBBBBBBB-0000000002-02"}'));
+
+        await run(first.options);
+        await run({ ...second.options, snapshotPath: first.snapshotPath });
+
+        assert.equal(first.notifications.length, 1);
+        assert.equal(second.notifications.length, 0);
+        assert.equal((await readSnapshot(first.snapshotPath)).failureKey, 'KSeF 500');
+        assert.ok((await readSnapshot(first.snapshotPath)).reason.includes('BBBBBBBBBB'));
+      });
+
+      it('a 500 followed by a 401 notifies both times', async () => {
+        const first = setup(failingWith(500, 'x'));
+        const second = setup(failingWith(401, 'x'));
+
+        await run(first.options);
+        await run({ ...second.options, snapshotPath: first.snapshotPath });
+
+        assert.equal(first.notifications.length, 1);
+        assert.equal(second.notifications.length, 1);
+        assert.equal((await readSnapshot(first.snapshotPath)).failureKey, 'KSeF 401');
+      });
+
+      it('a previous failed snapshot without failureKey notifies', async () => {
+        const { options, snapshotPath, notifications } = setup(offline);
+        await writeFile(snapshotPath, JSON.stringify({ status: 'failed', reason: 'Brak połączenia z KSeF: fetch failed', today: warsawDay(START) }));
+
+        await run(options);
+
+        assert.equal(notifications.length, 1);
+      });
+    });
+
     it('a different reason notifies', async () => {
       const first = setup(offline);
       const second = setup({ invoices: [], fetchError: new TypeError('other') });

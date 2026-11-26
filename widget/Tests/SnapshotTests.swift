@@ -18,6 +18,15 @@ final class SnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.updatedAt.timeIntervalSince1970, Fixtures.updatedAt.timeIntervalSince1970, accuracy: 1)
     }
 
+    func testIgnoresFailureKey() throws {
+        let json = Fixtures.contractJSON.replacingOccurrences(
+            of: "\"status\": \"complete\",",
+            with: "\"status\": \"failed\",\n  \"reason\": \"x\",\n  \"failureKey\": \"KSeF 500\",")
+        let snapshot = try SnapshotFile.decode(Data(json.utf8))
+        XCTAssertEqual(snapshot.status, .failed)
+        XCTAssertEqual(snapshot.reason, "x")
+    }
+
     func testUnknownStatusIsAnError() {
         let json = Fixtures.contractJSON.replacingOccurrences(of: "\"complete\"", with: "\"weird\"")
         XCTAssertThrowsError(try SnapshotFile.decode(Data(json.utf8)))

@@ -96,7 +96,7 @@ export interface MetadataPage {
 // src/report.ts
 export interface RunSummary {
   startedAt: Date; status: 'complete' | 'partial' | 'failed';
-  reason?: string; saved: InvoiceMetadata[];
+  reason?: string; failureKey?: string; saved: InvoiceMetadata[]; // failureKey: stable key of a failed run, see the widget plan's W1
 }
 ```
 
