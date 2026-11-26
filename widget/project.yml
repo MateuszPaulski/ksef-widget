@@ -36,6 +36,15 @@ targets:
         excludes: ["Fixtures/**"]
     dependencies:
       - target: KsefCore
+  KsefE2ETests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - E2ETests
+      - CoreTests/Support/TestCredentials.swift
+      - CoreTests/Support/RandomNip.swift
+    dependencies:
+      - target: KsefCore
   KsefWidget:
     type: application
     platform: macOS
