@@ -63,6 +63,8 @@ targets:
         INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_CFBundleDisplayName: KSeF
         PRODUCT_NAME: KSeF
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO   # no get-task-allow: nothing may attach to the app and read the key password
     dependencies:
       - target: KsefCore
       - target: KsefWidgetExtension
@@ -79,3 +81,5 @@ targets:
         INFOPLIST_FILE: Extension/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: KSeF
         CODE_SIGN_ENTITLEMENTS: Extension/Extension.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO

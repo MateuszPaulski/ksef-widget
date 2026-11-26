@@ -28,8 +28,8 @@ xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefWidget -configuratio
   -destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build -quiet build || exit 1
 
 if [[ -n $IDENTITY ]]; then
-  codesign --force --sign "$IDENTITY" --entitlements widget/Extension/Extension.entitlements "$EXTENSION" || exit 1
-  codesign --force --sign "$IDENTITY" "$APP" || exit 1
+  codesign --force --sign "$IDENTITY" --options runtime --entitlements widget/Extension/Extension.entitlements "$EXTENSION" || exit 1
+  codesign --force --sign "$IDENTITY" --options runtime "$APP" || exit 1
 fi
 
 codesign --verify --deep --strict "$APP" || exit 1

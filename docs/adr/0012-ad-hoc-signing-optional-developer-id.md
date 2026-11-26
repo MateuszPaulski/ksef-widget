@@ -10,7 +10,7 @@ ADR-0005 signs ad hoc and commits nothing personal; the repository is public. Th
 ## Decision
 
 - Builds are ad hoc by default (`CODE_SIGN_IDENTITY = "-"` in `widget/project.yml`); implementers never use a signing identity.
-- `scripts/build-app.sh [--install] [signing-identity]` builds Release ad hoc and, when an identity is passed, re-signs inside out with it: the extension with `widget/Extension/Extension.entitlements`, then the app with no entitlements. No hardened runtime, no notarisation. The identity is never written to a tracked file.
+- `scripts/build-app.sh [--install] [signing-identity]` builds Release ad hoc and, when an identity is passed, re-signs inside out with it: the extension with `widget/Extension/Extension.entitlements`, then the app with no entitlements. Both targets are built with the hardened runtime and without `get-task-allow` (`ENABLE_HARDENED_RUNTIME`, `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` in `widget/project.yml`), and the re-sign passes `--options runtime`, so another process of the owner cannot attach to the app or inject code to read the key password; no runtime exception entitlements are used. No notarisation. The identity is never written to a tracked file.
 - Developer ID is recommended, not required.
 
 ## Consequences
