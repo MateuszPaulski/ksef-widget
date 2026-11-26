@@ -137,6 +137,40 @@ final class HTTPTests: XCTestCase {
         XCTAssertFalse(configuration.waitsForConnectivity)
     }
 
+    func testTheSessionNeverFollowsARedirect() throws {
+        let session = URLSession(configuration: .ephemeral)
+        let source = try XCTUnwrap(URL(string: "https://api.example/a"))
+        let target = try XCTUnwrap(URL(string: "https://elsewhere.example/b"))
+        let response = try XCTUnwrap(
+            HTTPURLResponse(url: source, statusCode: 302, httpVersion: nil, headerFields: ["Location": target.absoluteString])
+        )
+        let delegate = try XCTUnwrap(URLSessionTransport().sessionDelegate as? URLSessionTaskDelegate)
+        var answered = false
+        var followed: URLRequest?
+
+        delegate.urlSession?(
+            session, task: session.dataTask(with: source), willPerformHTTPRedirection: response, newRequest: URLRequest(url: target)
+        ) { request in
+            answered = true
+            followed = request
+        }
+
+        XCTAssertTrue(answered)
+        XCTAssertNil(followed)
+    }
+
+    func testARedirectIsANon2xxApiError() async {
+        let (http, _, _) = setup([.reply(status: 302, headers: ["Location": "https://elsewhere.example/"])])
+        do {
+            _ = try await http.send("POST", "/auth/token")
+            XCTFail("expected KsefApiError")
+        } catch let error as KsefApiError {
+            XCTAssertEqual(error.status, 302)
+        } catch {
+            XCTFail("\(error)")
+        }
+    }
+
     func testSendsHeadersAndBodies() async throws {
         let (http, transport, _) = setup([.text(200, ""), .text(200, ""), .text(200, "")])
         _ = try await http.send("POST", "/j", token: "tok", json: .object([("a", .number(1))]))

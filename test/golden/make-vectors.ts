@@ -198,9 +198,13 @@ async function formatVectors(dir: string, outDir: string): Promise<void> {
   const c: InvoiceMetadata = {
     ...a,
     ksefNumber: '5265877635-20261120-0123456789AD-CD',
-    seller: { nip: '1111111111', name: 'Zakład "Ł/ódź" \\ <b>*x*</b>\n\ttab\u0001  ✓' },
+    seller: {
+      nip: "1/2 (3)!*'ł",
+      name: 'Zakład "Ł/ódź" \\ <b>*x*</b>\n\ttab\u0001  ✓ https://evil.example WwW.evil.example www.www.x',
+    },
     invoiceNumber: 'FV|1\n# x',
     grossAmount: -0.5,
+    currency: 'P_N',
   };
   const invoices = [a, b, c];
 

@@ -91,4 +91,15 @@ final class PrivateKeyTests: XCTestCase {
             XCTAssertTrue(errorMessage($0).hasPrefix("Nieobsługiwany algorytm szyfrowania klucza: 1.2.840.113549.3.7 (des-ede3-cbc). "), errorMessage($0))
         }
     }
+
+    func testRejectsAnAbsurdPbkdf2IterationCountBeforeDerivingAnything() {
+        let pem = encryptedPem(privateKeyInfo: shortScalarKeyInfo, password: "x", declaredIterations: 10_000_001)
+
+        XCTAssertThrowsError(try decryptPrivateKey(pem: pem, password: "x")) {
+            XCTAssertEqual(
+                errorMessage($0),
+                "Nieobsługiwana liczba iteracji PBKDF2 klucza: 10000001 (największa obsługiwana: 10000000)."
+            )
+        }
+    }
 }

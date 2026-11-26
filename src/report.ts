@@ -31,12 +31,20 @@ function reverseDate(issueDate: string, separator: string): string {
   return issueDate.split('-').reverse().join(separator);
 }
 
+// Everything outside the RFC 3986 unreserved set, byte by byte: encodeURIComponent leaves `)` alone (it would end a
+// Markdown link) and throws on a lone surrogate.
+function encodePathSegment(text: string): string {
+  return Array.from(new TextEncoder().encode(text), (byte) =>
+    /[A-Za-z0-9\-._~]/.test(String.fromCharCode(byte)) ? String.fromCharCode(byte) : `%${byte.toString(16).toUpperCase().padStart(2, '0')}`,
+  ).join('');
+}
+
 export function invoiceViewUrl(
   environment: Environment,
   invoice: Pick<InvoiceMetadata, 'seller' | 'issueDate' | 'invoiceHash'>,
 ): string {
   const hash = invoice.invoiceHash.replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-  return `${ENVIRONMENTS[environment].qrBase}/invoice/${invoice.seller.nip}/${reverseDate(invoice.issueDate, '-')}/${hash}`;
+  return `${ENVIRONMENTS[environment].qrBase}/invoice/${encodePathSegment(invoice.seller.nip)}/${reverseDate(invoice.issueDate, '-')}/${hash}`;
 }
 
 export function invoiceCountLabel(n: number): string {
@@ -47,7 +55,12 @@ export function invoiceCountLabel(n: number): string {
 }
 
 export function escapeMarkdown(text: string): string {
-  return text.replace(/[\r\n]+/g, ' ').replace(/[\\`*_[\]<>#|]/g, '\\$&');
+  // The last two steps stop a bare URL in a seller name from becoming a clickable link.
+  return text
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/[\\`*_[\]<>#|]/g, '\\$&')
+    .replaceAll('://', '\\://')
+    .replace(/(www)\./gi, '$1\\.');
 }
 
 export function warsawDay(date: Date): string {
@@ -71,8 +84,8 @@ export function formatReportSection(summary: RunSummary, environment: Environmen
   if (summary.saved.length > 0) lines.push('');
   for (const invoice of summary.saved) {
     lines.push(
-      `- **${escapeMarkdown(sellerLabel(invoice))}** (NIP ${invoice.seller.nip})` +
-        ` — nr ${escapeMarkdown(invoice.invoiceNumber)}, ${formatAmount(invoice.grossAmount, invoice.currency)}` +
+      `- **${escapeMarkdown(sellerLabel(invoice))}** (NIP ${escapeMarkdown(invoice.seller.nip)})` +
+        ` — nr ${escapeMarkdown(invoice.invoiceNumber)}, ${formatAmount(invoice.grossAmount, escapeMarkdown(invoice.currency))}` +
         `, wystawiona ${reverseDate(invoice.issueDate, '.')}` +
         ` — [podgląd w KSeF](${invoiceViewUrl(environment, invoice)}) — \`${invoice.ksefNumber}\``,
     );

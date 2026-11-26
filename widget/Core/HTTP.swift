@@ -14,10 +14,21 @@ public protocol HTTPTransport: Sendable {
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
 }
 
+/// A redirect would replay the signed login request or the bearer token to another host; the 3xx is returned instead.
+final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
+}
+
 public struct URLSessionTransport: HTTPTransport {
     private let session: URLSession
 
     var configuration: URLSessionConfiguration { session.configuration }
+    var sessionDelegate: URLSessionDelegate? { session.delegate }
 
     public init() {
         let configuration = URLSessionConfiguration.ephemeral
@@ -27,7 +38,7 @@ public struct URLSessionTransport: HTTPTransport {
         configuration.urlCache = nil
         configuration.httpCookieStorage = nil
         configuration.waitsForConnectivity = false
-        session = URLSession(configuration: configuration)
+        session = URLSession(configuration: configuration, delegate: NoRedirectDelegate(), delegateQueue: nil)
     }
 
     public func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {

@@ -46,6 +46,11 @@ describe('invoiceViewUrl', () => {
     );
     assert.ok(invoiceViewUrl('test', invoice()).startsWith('https://qr-test.ksef.mf.gov.pl/invoice/'));
   });
+
+  it('percent-encodes the seller NIP as one path segment', () => {
+    const url = invoiceViewUrl('prod', invoice({ seller: { nip: "1/2 (3)!*'ł-._~", name: null } }));
+    assert.ok(url.startsWith('https://qr.ksef.mf.gov.pl/invoice/1%2F2%20%283%29%21%2A%27%C5%82-._~/01-02-2026/'), url);
+  });
 });
 
 describe('invoiceCountLabel', () => {
@@ -60,6 +65,13 @@ describe('escapeMarkdown', () => {
   it('escapes Markdown characters and collapses newlines', () => {
     assert.equal(escapeMarkdown('\\ ` * _ [ ] < > # |'), '\\\\ \\` \\* \\_ \\[ \\] \\< \\> \\# \\|');
     assert.equal(escapeMarkdown('a\r\n\nb\rc'), 'a b c');
+  });
+
+  it('neutralises bare-URL autolinks without touching other text', () => {
+    assert.equal(escapeMarkdown('https://evil.example'), 'https\\://evil.example');
+    assert.equal(escapeMarkdown('www.evil.example'), 'www\\.evil.example');
+    assert.equal(escapeMarkdown('WwW.x www.www.y'), 'WwW\\.x www\\.www\\.y');
+    assert.equal(escapeMarkdown('Acme Sp. z o.o. a:b a/b 12.50'), 'Acme Sp. z o.o. a:b a/b 12.50');
   });
 });
 
@@ -104,9 +116,18 @@ describe('formatReportSection', () => {
     const section = formatReportSection({ startedAt, status: 'complete', saved: [hostile] }, 'prod');
     const bullets = section.split('\n').filter((line) => line.startsWith('- '));
     assert.equal(bullets.length, 1);
-    assert.ok(bullets[0]?.includes('Evil\\*Corp \\[x\\](http://e) \\| \\# \\<b\\> line2'));
+    assert.ok(bullets[0]?.includes('Evil\\*Corp \\[x\\](http\\://e) \\| \\# \\<b\\> line2'));
     assert.ok(bullets[0]?.includes('nr FV\\|1 \\# x'));
     assert.ok(!section.split('\n').some((line) => line.startsWith('# ')));
+  });
+
+  it('breaks bare URLs in a seller name and escapes the NIP and currency', () => {
+    const hostile = invoice({ seller: { nip: '1*2', name: 'https://evil.example www.evil.example' }, currency: 'P_N' });
+    const section = formatReportSection({ startedAt, status: 'complete', saved: [hostile] }, 'prod');
+    const bullet = section.split('\n').find((line) => line.startsWith('- '));
+    assert.ok(bullet?.startsWith('- **https\\://evil.example www\\.evil.example** (NIP 1\\*2) — nr FV/1/2026, 12'));
+    assert.ok(bullet?.includes(' P\\_N, wystawiona'));
+    assert.ok(bullet?.includes('/invoice/1%2A2/01-02-2026/'));
   });
 });
 

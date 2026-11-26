@@ -56,7 +56,8 @@ func encryptedPem(
     keySize: Int = 32,
     declareKeyLength: Bool = false,
     kdfOID: String = "1.2.840.113549.1.5.12",
-    cipherOID: String? = nil
+    cipherOID: String? = nil,
+    declaredIterations: UInt32? = nil
 ) -> String {
     let salt = [UInt8](repeating: 0x5A, count: 16)
     let iv = [UInt8](repeating: 0xA5, count: 16)
@@ -68,7 +69,12 @@ func encryptedPem(
     var produced = 0
     _ = CCCrypt(CCOperation(kCCEncrypt), CCAlgorithm(kCCAlgorithmAES), CCOptions(kCCOptionPKCS7Padding), derived, keySize, iv, privateKeyInfo, privateKeyInfo.count, &ciphertext, ciphertext.count, &produced)
 
-    var kdfParameters = der(0x04, salt) + der(0x02, [UInt8(iterations >> 8), UInt8(iterations & 0xFF)])
+    // Only the declared number is written; the key itself is derived with `iterations`, so a huge count costs nothing.
+    let written = declaredIterations ?? iterations
+    var counter = withUnsafeBytes(of: written.bigEndian) { Array($0) }
+    while counter.count > 1 && counter[0] == 0 { counter.removeFirst() }
+    if counter[0] >= 0x80 { counter.insert(0, at: 0) }
+    var kdfParameters = der(0x04, salt) + der(0x02, counter)
     if declareKeyLength { kdfParameters += der(0x02, [UInt8(keySize)]) }
     if let prfOID = prf.oid { kdfParameters += der(0x30, derOID(prfOID) + [0x05, 0x00]) }
     let aesOIDs = [16: "2.16.840.1.101.3.4.1.2", 24: "2.16.840.1.101.3.4.1.22", 32: "2.16.840.1.101.3.4.1.42"]

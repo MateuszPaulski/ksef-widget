@@ -35,10 +35,18 @@ private func reverseDate(_ issueDate: String, separator: String) -> String {
     issueDate.split(separator: "-", omittingEmptySubsequences: false).reversed().joined(separator: separator)
 }
 
+/// Everything outside the RFC 3986 unreserved set, byte by byte, so the Swift and TypeScript URLs stay identical.
+private func encodePathSegment(_ text: String) -> String {
+    text.utf8.map { byte in
+        let isUnreserved = (48...57).contains(byte) || (65...90).contains(byte) || (97...122).contains(byte) || [45, 46, 95, 126].contains(byte)
+        return isUnreserved ? String(UnicodeScalar(byte)) : String(format: "%%%02X", byte)
+    }.joined()
+}
+
 func invoiceViewUrl(_ environment: KsefEnvironment, sellerNip: String, issueDate: String, invoiceHash: String) -> String {
     var hash = invoiceHash.replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
     while hash.hasSuffix("=") { hash.removeLast() }
-    return "\(environment.qrBase)/invoice/\(sellerNip)/\(reverseDate(issueDate, separator: "-"))/\(hash)"
+    return "\(environment.qrBase)/invoice/\(encodePathSegment(sellerNip))/\(reverseDate(issueDate, separator: "-"))/\(hash)"
 }
 
 public func invoiceCountLabel(_ n: Int) -> String {
@@ -48,21 +56,47 @@ public func invoiceCountLabel(_ n: Int) -> String {
     return isFew ? "\(n) nowe faktury" : "\(n) nowych faktur"
 }
 
+/// Scalar-level on purpose: "\r\n" is one Character, U+2028 must stay as it is, and a combining mark after "/" must not
+/// hide a pattern. The last step stops a bare URL in a seller name from becoming a clickable link.
 func escapeMarkdown(_ text: String) -> String {
-    // Scalars, not Characters: "\r\n" is one Character, and U+2028 must stay as it is.
-    var result = String.UnicodeScalarView()
+    var escaped: [Unicode.Scalar] = []
     var inLineBreak = false
     for scalar in text.unicodeScalars {
         if scalar == "\r" || scalar == "\n" {
-            if !inLineBreak { result.append(" ") }
+            if !inLineBreak { escaped.append(" ") }
             inLineBreak = true
             continue
         }
         inLineBreak = false
-        if "\\`*_[]<>#|".unicodeScalars.contains(scalar) { result.append("\\") }
-        result.append(scalar)
+        if "\\`*_[]<>#|".unicodeScalars.contains(scalar) { escaped.append("\\") }
+        escaped.append(scalar)
+    }
+
+    let schemeSeparator: [Unicode.Scalar] = [":", "/", "/"]
+    let www: [Unicode.Scalar] = ["w", "w", "w", "."]
+    var result = String.UnicodeScalarView()
+    var index = 0
+    while index < escaped.count {
+        let rest = escaped[index...]
+        if rest.starts(with: schemeSeparator) {
+            result.append("\\")
+            result.append(contentsOf: schemeSeparator)
+            index += schemeSeparator.count
+        } else if rest.count >= www.count, rest.prefix(www.count).map(asciiLowercased) == www {
+            result.append(contentsOf: rest.prefix(www.count - 1))
+            result.append("\\")
+            result.append(".")
+            index += www.count
+        } else {
+            result.append(escaped[index])
+            index += 1
+        }
     }
     return String(result)
+}
+
+private func asciiLowercased(_ scalar: Unicode.Scalar) -> Unicode.Scalar {
+    ("A"..."Z").contains(scalar) ? Unicode.Scalar(scalar.value + 32)! : scalar
 }
 
 private func warsawComponents(_ date: Date) -> DateComponents {
@@ -105,8 +139,8 @@ func formatReportSection(_ summary: RunSummary, _ environment: KsefEnvironment) 
             environment, sellerNip: invoice.seller.nip, issueDate: invoice.issueDate, invoiceHash: invoice.invoiceHash
         )
         lines.append(
-            "- **\(escapeMarkdown(sellerLabel(invoice.seller)))** (NIP \(invoice.seller.nip))"
-                + " — nr \(escapeMarkdown(invoice.invoiceNumber)), \(formatAmount(invoice.grossAmount, invoice.currency))"
+            "- **\(escapeMarkdown(sellerLabel(invoice.seller)))** (NIP \(escapeMarkdown(invoice.seller.nip)))"
+                + " — nr \(escapeMarkdown(invoice.invoiceNumber)), \(formatAmount(invoice.grossAmount, escapeMarkdown(invoice.currency)))"
                 + ", wystawiona \(reverseDate(invoice.issueDate, separator: "."))"
                 + " — [podgląd w KSeF](\(url)) — `\(invoice.ksefNumber)`"
         )

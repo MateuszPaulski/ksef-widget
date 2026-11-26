@@ -51,6 +51,9 @@ private let algorithmNames: [String: String] = [
     "1.2.840.113549.2.13": "hmacWithSHA512-256",
 ]
 
+// A hostile key file must not be able to pin the CPU for hours; real keys use a few thousand to a few hundred thousand.
+private let maxPbkdf2Iterations: UInt32 = 10_000_000
+
 private let decryptionFailed = "odszyfrowanie nie powiodło się"
 
 private func unreadable(_ reason: String) -> KsefError {
@@ -62,6 +65,10 @@ private func unsupportedAlgorithm(_ oid: String) -> KsefError {
         "Nieobsługiwany algorytm szyfrowania klucza: \(oid) (\(algorithmNames[oid] ?? "nieznany")). "
             + "Obsługiwane: PBES2 z PBKDF2 (HMAC-SHA1, SHA224, SHA256, SHA384, SHA512) i AES-128/192/256-CBC."
     )
+}
+
+private func unsupportedIterations(_ count: UInt32) -> KsefError {
+    KsefError("Nieobsługiwana liczba iteracji PBKDF2 klucza: \(count) (największa obsługiwana: \(maxPbkdf2Iterations)).")
 }
 
 private func unsupportedType(_ type: String) -> KsefError {
@@ -124,9 +131,12 @@ private func parseEncryptedKey(_ der: [UInt8]) throws -> EncryptedKey {
     guard declaredKeySize.map({ Int($0) == keySize }) ?? true else { throw DERError() }
     guard let iv = cipher.parameters, iv.tag == 0x04, iv.body.count == kCCBlockSizeAES128 else { throw DERError() }
 
+    let iterationCount = try unsignedInteger(iterations)
+    guard iterationCount <= maxPbkdf2Iterations else { throw unsupportedIterations(iterationCount) }
+
     return EncryptedKey(
         salt: salt.body,
-        iterations: try unsignedInteger(iterations),
+        iterations: iterationCount,
         prf: prf,
         keySize: keySize,
         iv: iv.body,
