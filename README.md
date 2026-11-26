@@ -29,7 +29,7 @@ A KSeF certificate has no permission scope (ADR-0002): whoever holds the key fil
 scripts/build-app.sh --install
 ```
 
-This builds `KSeF.app` ad hoc (no Apple account needed), verifies the signature, copies it to `~/Applications`, unregisters the build copy so only one copy is known to macOS, and opens it. Without `--install` it only builds, verifies and prints the signature's designated requirement (`cdhash` means ad hoc). The build copy stays in `widget/build/Build/Products/Release/KSeF.app`.
+This builds `KSeF.app` ad hoc (no Apple account needed), verifies the signature, copies it to `~/Applications`, unregisters the build copy so only one copy is known to macOS, and opens it; it also removes `~/Applications/KsefWidget.app`, the earlier widget-only copy that shares the bundle identifier. Without `--install` it only builds, verifies and prints the signature's designated requirement (`cdhash` means ad hoc). The build copy stays in `widget/build/Build/Products/Release/KSeF.app`.
 
 With a Developer ID certificate the script can re-sign the app, so macOS recognises it across rebuilds:
 

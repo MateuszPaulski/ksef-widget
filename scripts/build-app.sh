@@ -39,7 +39,7 @@ codesign -dr - "$APP" 2>&1 | grep designated
 if (( INSTALL )); then
   osascript -e 'quit app id "local.ksef-daily-fetch.KsefWidget"' 2>/dev/null
   mkdir -p ~/Applications || exit 1
-  rm -rf ~/Applications/KSeF.app
+  rm -rf ~/Applications/KSeF.app ~/Applications/KsefWidget.app
   ditto "$APP" ~/Applications/KSeF.app || exit 1
   $LSREGISTER -u "$APP"
   open ~/Applications/KSeF.app
