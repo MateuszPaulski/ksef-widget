@@ -5,9 +5,9 @@ Status: approved scope (user), technical calls by the orchestrator, details by t
 
 ## 1. Intent
 
-The owner is a Polish sole proprietor (JDG, one NIP, active VAT payer) on macOS (Apple Silicon). Since 2026 his purchase invoices arrive through the national e-invoicing system KSeF (Krajowy System e-Faktur, API 2.0), not by e-mail. Nobody tells him when a new one appears, and the legal "date of receipt" is the date KSeF assigns its number, not the date he looks.
+The owner is a Polish sole proprietor (JDG, one NIP, active VAT payer) on macOS (Apple Silicon). Since 2026 their purchase invoices arrive through the national e-invoicing system KSeF (Krajowy System e-Faktur, API 2.0), not by e-mail. Nobody tells them when a new one appears, and the legal "date of receipt" is the date KSeF assigns its number, not the date they look.
 
-This tool runs once a day on his Mac, pulls every new purchase invoice from KSeF, saves the original XML to disk and tells him what arrived: seller, invoice number, gross amount, issue date, and a link to view the invoice in KSeF. It is the first step ("to start with"); accounting export and other features may follow later and are out of scope now.
+This tool runs once a day on their Mac, pulls every new purchase invoice from KSeF, saves the original XML to disk and tells them what arrived: seller, invoice number, gross amount, issue date, and a link to view the invoice in KSeF. It is the first step ("to start with"); accounting export and other features may follow later and are out of scope now.
 
 ## 2. Goals
 

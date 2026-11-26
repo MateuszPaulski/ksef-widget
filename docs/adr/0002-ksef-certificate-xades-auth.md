@@ -14,7 +14,7 @@ Authenticate every run with the owner's KSeF `Authentication` certificate: chall
 ## Consequences
 
 - The tool keeps working after 2026-12-31 regardless of the token regulation.
-- **A KSeF certificate has no permission scope.** Unlike a token, which can be limited to `InvoiceRead`, the certificate authenticates the owner as a person and carries all of his rights in the NIP context, including issuing invoices. Whoever has the key file and its password can act as the owner in KSeF. Hence: key file mode `0600` outside the repo, password only in Keychain, minimal pinned dependencies, and revocation in Aplikacja Podatnika if the Mac is lost or the key leaks.
+- **A KSeF certificate has no permission scope.** Unlike a token, which can be limited to `InvoiceRead`, the certificate authenticates the owner as a person and carries all of their rights in the NIP context, including issuing invoices. Whoever has the key file and its password can act as the owner in KSeF. Hence: key file mode `0600` outside the repo, password only in Keychain, minimal pinned dependencies, and revocation in Aplikacja Podatnika if the Mac is lost or the key leaks.
 - XML canonicalization and signing are needed (ADR-0004 picks the library).
 - The owner must renew the certificate at least every two years; an expired certificate shows up as a failed-run notification.
 - `GET /auth/{referenceNumber}` is used now; it sunsets 2027-06-15 and must be switched to `/auth/rev2/{referenceNumber}` once that is on PROD.

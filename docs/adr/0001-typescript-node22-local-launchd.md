@@ -5,7 +5,7 @@ Status: accepted
 
 ## Context
 
-The tool fetches the owner's purchase invoices from KSeF once a day and notifies him. It holds a KSeF certificate private key that acts with the owner's full KSeF rights (see ADR-0002). The owner works on a single Mac (Apple Silicon) with Node v22.23.4 and pnpm. Options for where it runs: a scheduled job on that Mac, or a cloud scheduled job. Options for how it is built: a compiled TypeScript project, or TypeScript executed directly by Node 22's built-in type stripping (on by default since 22.18).
+The tool fetches the owner's purchase invoices from KSeF once a day and notifies them. It holds a KSeF certificate private key that acts with the owner's full KSeF rights (see ADR-0002). The owner works on a single Mac (Apple Silicon) with Node v22.23.4 and pnpm. Options for where it runs: a scheduled job on that Mac, or a cloud scheduled job. Options for how it is built: a compiled TypeScript project, or TypeScript executed directly by Node 22's built-in type stripping (on by default since 22.18).
 
 ## Decision
 

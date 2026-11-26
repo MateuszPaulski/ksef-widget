@@ -1,5 +1,23 @@
 import { X509Certificate, createPrivateKey, type KeyObject } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
+
+const KEYCHAIN_SERVICE = 'ksef-daily-fetch';
+
+type Exec = (file: string, args: string[]) => Promise<{ stdout: string }>;
+
+export async function readKeyPassword(
+  nip: string,
+  exec: Exec = promisify(execFile) as Exec,
+): Promise<string> {
+  try {
+    const { stdout } = await exec('security', ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-a', nip, '-w']);
+    return stdout.replace(/\r?\n$/, '');
+  } catch {
+    throw new Error(`Brak hasła klucza w Pęku kluczy (usługa ${KEYCHAIN_SERVICE}, konto ${nip})`);
+  }
+}
 
 export interface Credentials {
   certificatePem: string;

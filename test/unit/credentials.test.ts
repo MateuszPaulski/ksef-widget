@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
-import { loadCredentials } from '../../src/credentials.ts';
+import { loadCredentials, readKeyPassword } from '../../src/credentials.ts';
 import { makeTestCredentials, type TestCredentialFiles } from '../support/certs.ts';
 import { randomNip } from '../support/nip.ts';
 
@@ -48,6 +48,29 @@ describe('loadCredentials', () => {
     await assert.rejects(
       loadCredentials(rsa.certificatePath, ec.keyPath, ec.password),
       { message: 'Klucz prywatny nie pasuje do certyfikatu' },
+    );
+  });
+});
+
+describe('readKeyPassword', () => {
+  it('calls security with the service and NIP', async () => {
+    const calls: Array<[string, string[]]> = [];
+    const password = await readKeyPassword('5265877635', async (file, args) => {
+      calls.push([file, args]);
+      return { stdout: 'secret\n' };
+    });
+    assert.equal(password, 'secret');
+    assert.deepEqual(calls, [
+      ['security', ['find-generic-password', '-s', 'ksef-daily-fetch', '-a', '5265877635', '-w']],
+    ]);
+  });
+
+  it('explains a missing Keychain item', async () => {
+    await assert.rejects(
+      readKeyPassword('5265877635', async () => {
+        throw new Error('The specified item could not be found in the keychain.');
+      }),
+      { message: 'Brak hasła klucza w Pęku kluczy (usługa ksef-daily-fetch, konto 5265877635)' },
     );
   });
 });
