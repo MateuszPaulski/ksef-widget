@@ -13,10 +13,15 @@ public struct KeychainSecretStore: SecretStore {
     static let label = "KSeF — hasło klucza prywatnego"
     static let missingPasswordMessage = "Brak hasła klucza w Pęku kluczy (usługa \(service), konto \(account))"
 
-    public init() {}
+    private let itemService: String
+
+    public init() { itemService = Self.service }
+
+    /// For the opt-in Keychain test, which must never touch the production item.
+    init(service: String) { itemService = service }
 
     private var identity: [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: Self.service, kSecAttrAccount as String: Self.account]
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: itemService, kSecAttrAccount as String: Self.account]
     }
 
     public func readKeyPassword() throws -> String {
