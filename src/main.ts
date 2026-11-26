@@ -5,7 +5,9 @@ import { createOsascriptNotifier } from './notify.ts';
 import { run } from './run.ts';
 
 const USAGE = 'Usage: node src/main.ts [--dry-run | --test-notification]';
-const EXIT_CODES = { complete: 0, partial: 2, failed: 1 } as const;
+// 3 = main.ts handled a failure itself; 1 is left to usage errors and to Node dying before main runs,
+// which scripts/run-daily.sh reports.
+const EXIT_CODES = { complete: 0, partial: 2, failed: 3 } as const;
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -41,7 +43,7 @@ async function main(args: string[]): Promise<number> {
         console.error(`could not show the notification: ${errorMessage(notifyErr)}`);
       }
     }
-    return 1;
+    return EXIT_CODES.failed;
   }
 
   const summary = await run({

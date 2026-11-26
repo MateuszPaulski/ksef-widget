@@ -67,7 +67,7 @@ If nothing appears, allow notifications for **Script Editor** (the host of `osas
 node src/main.ts --dry-run
 ```
 
-Authenticates and lists the first window without downloading or writing anything, and without notifying even on failure (the reason goes to stderr, exit code 1). Expected line: `dry run: N invoices in the first window, M not yet saved`. Typical errors:
+Authenticates and lists the first window without downloading or writing anything, and without notifying even on failure (the reason goes to stderr, exit code 3). Expected line: `dry run: N invoices in the first window, M not yet saved`. Typical errors:
 
 - `Nie można odczytać klucza prywatnego (złe hasło lub format)`: wrong key password in the Keychain, or the key is not an encrypted PKCS#8 PEM.
 - `Brak hasła klucza w Pęku kluczy`: the Keychain item for this NIP does not exist.
@@ -80,7 +80,7 @@ Authenticates and lists the first window without downloading or writing anything
 node src/main.ts
 ```
 
-Files land in `data/invoices/YYYY/MM/<ksefNumber>.xml`, `data/reports/YYYY-MM-DD.md`, `data/index.jsonl` (one line per saved invoice) and `data/state.json` (checkpoint). Exit codes: 0 complete, 2 partial, 1 failed. KSeF allows 64 single-invoice downloads per hour, so a run saves at most 60. If a large backfill ends with `Limit 60 pobrań na jedno uruchomienie.`, run it again after an hour.
+Files land in `data/invoices/YYYY/MM/<ksefNumber>.xml`, `data/reports/YYYY-MM-DD.md`, `data/index.jsonl` (one line per saved invoice) and `data/state.json` (checkpoint). Exit codes: 0 complete, 2 partial, 3 failed (handled by `main.ts`, which has notified), 1 usage error or Node crashed before `main` ran (the wrapper script notifies). KSeF allows 64 single-invoice downloads per hour, so a run saves at most 60. If a large backfill ends with `Limit 60 pobrań na jedno uruchomienie.`, run it again after an hour.
 
 ## Install the daily job
 
@@ -88,7 +88,9 @@ Files land in `data/invoices/YYYY/MM/<ksefNumber>.xml`, `data/reports/YYYY-MM-DD
 scripts/launchagent.sh install
 ```
 
-The job runs daily at 08:00, or when the Mac wakes if it slept through 08:00; it does not run while the Mac is off. Logs: `~/Library/Logs/ksef-daily-fetch.log`. Run it now with `launchctl kickstart gui/$(id -u)/local.ksef-daily-fetch`. Remove it with `scripts/launchagent.sh uninstall`. Re-run `install` after a Node upgrade that changes the output of `command -v node`; if Node has vanished, the wrapper script still shows a notification.
+Run `pnpm install --frozen-lockfile` in the checkout the LaunchAgent will run from before `install`, and never install the agent from a `.claude/worktrees/…` path: the plist records the absolute path of the checkout it was generated in.
+
+The job runs daily at 08:00, or when the Mac wakes if it slept through 08:00; it does not run while the Mac is off. Logs: `~/Library/Logs/ksef-daily-fetch.log`. Run it now with `launchctl kickstart gui/$(id -u)/local.ksef-daily-fetch`. Remove it with `scripts/launchagent.sh uninstall`. Re-run `install` after a Node upgrade that changes the output of `command -v node`; if Node has vanished or the program cannot start (for example `node_modules` is missing), the wrapper script still shows a notification.
 
 ## Troubleshooting
 

@@ -28,7 +28,7 @@ This tool runs once a day on their Mac, pulls every new purchase invoice from KS
 
 ## 4. Anti-goal
 
-**A job that fails silently.** Every run ends in exactly one of: nothing new (silent by design), new invoices (notification + report), partial (notification + report), failed (notification + report + log). A failure before the config is readable still notifies. A launchd job that cannot even start Node still notifies (wrapper script). The README's setup verifies that a notification actually appears on screen, because macOS can mute notifications per app.
+**A job that fails silently.** Every run ends in exactly one of: nothing new (silent by design), new invoices (notification + report), partial (notification + report), failed (notification + report + log). A failure before the config is readable still notifies. A launchd job that cannot even start Node, or whose Node dies before `main` runs (missing `node_modules`, an import error), still notifies (wrapper script). The README's setup verifies that a notification actually appears on screen, because macOS can mute notifications per app.
 
 ## 5. Constraints and facts
 
@@ -144,10 +144,10 @@ Calls marked (O) are the orchestrator's; (S) are the spec author's, made from th
 - (S) Code, comments, docs, ADRs, README: English. User-facing strings (notification, report, and error messages written by us that reach a notification): Polish.
 
 ### 7.6 Entry points
-- `node src/main.ts`: normal run. Exit code 0 = complete, 2 = partial, 1 = failed.
-- `node src/main.ts --dry-run`: authenticates and lists the first window only; prints counts to stdout; downloads nothing, writes nothing, notifies nothing, even when it fails (the owner runs it in a terminal: the reason goes to stderr and the exit code is 1). Lets the owner check certificate, key password, Keychain and permissions on PROD without spending download quota.
+- `node src/main.ts`: normal run. Exit code 0 = complete, 2 = partial, 3 = failed (`main.ts` handled it, including the notification); 1 = usage error or Node crashed before `main` ran.
+- `node src/main.ts --dry-run`: authenticates and lists the first window only; prints counts to stdout; downloads nothing, writes nothing, notifies nothing, even when it fails (the owner runs it in a terminal: the reason goes to stderr and the exit code is 3). Lets the owner check certificate, key password, Keychain and permissions on PROD without spending download quota.
 - `node src/main.ts --test-notification`: shows a sample notification so the owner can allow notifications for Script Editor (osascript's host) in System Settings.
-- `scripts/run-daily.sh <node>`: launchd's target; runs `main.ts` and, if Node exits with anything other than 0/1/2 (e.g. 127 when the Node binary vanished after an upgrade), shows a notification itself.
+- `scripts/run-daily.sh <node>`: launchd's target; runs `main.ts` and, if Node exits with anything other than 0/2/3 (e.g. 127 when the Node binary vanished after an upgrade, or 1 when Node died before `main` ran, such as `ERR_MODULE_NOT_FOUND` without `node_modules`), shows a notification itself.
 - `scripts/launchagent.sh print|install|uninstall`: generates the LaunchAgent plist (label `local.ksef-daily-fetch`, daily at 08:00, logs to `~/Library/Logs/ksef-daily-fetch.log`), installs it with `launchctl bootstrap gui/<uid>` or removes it. (O) The implementer only runs `print`; the owner installs after merging and after setting up the certificate.
 
 ### 7.7 Verification before real credentials
