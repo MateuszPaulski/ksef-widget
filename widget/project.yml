@@ -24,6 +24,18 @@ targets:
     type: bundle.unit-test
     platform: macOS
     sources: [Tests, Shared]
+  KsefCore:
+    type: library.static
+    platform: macOS
+    sources: [Core]
+  KsefCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: CoreTests
+        excludes: ["Fixtures/**"]
+    dependencies:
+      - target: KsefCore
   KsefWidget:
     type: application
     platform: macOS
