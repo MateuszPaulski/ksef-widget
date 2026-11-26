@@ -22,7 +22,9 @@ export async function makeTestCredentials(options: {
   const certificatePath = join(dir, `${nip}.crt`);
   const keyPath = join(dir, `${nip}.key`);
   const keyArgs =
-    keyType === 'rsa' ? ['-newkey', 'rsa:2048'] : ['-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256'];
+    keyType === 'rsa'
+      ? ['-newkey', 'rsa:2048']
+      : ['-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256', '-pkeyopt', 'ec_param_enc:named_curve'];
   await execFileAsync('/usr/bin/openssl', [
     'req',
     '-x509',
