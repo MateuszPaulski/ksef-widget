@@ -37,12 +37,12 @@ public struct KeychainSecretStore: SecretStore {
     }
 
     public func saveKeyPassword(_ password: String) throws {
-        let data = Data(password.utf8)
-        var status = SecItemUpdate(identity as CFDictionary, [kSecValueData as String: data] as CFDictionary)
-        if status == errSecItemNotFound {
-            let item = identity.merging([kSecValueData as String: data, kSecAttrLabel as String: Self.label]) { $1 }
-            status = SecItemAdd(item as CFDictionary, nil)
-        }
+        // Delete, then add: updating in place would write the password into an item that other software planted under
+        // this service and account with a permissive access list.
+        let deleted = SecItemDelete(identity as CFDictionary)
+        guard deleted == errSecSuccess || deleted == errSecItemNotFound else { throw Self.failure(deleted) }
+        let item = identity.merging([kSecValueData as String: Data(password.utf8), kSecAttrLabel as String: Self.label]) { $1 }
+        let status = SecItemAdd(item as CFDictionary, nil)
         guard status == errSecSuccess else { throw Self.failure(status) }
     }
 
