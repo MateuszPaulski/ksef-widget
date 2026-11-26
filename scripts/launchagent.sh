@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Generates, installs or removes the daily LaunchAgent.
+# Generates, installs or removes the hourly LaunchAgent.
 # Usage: scripts/launchagent.sh print | install | uninstall
 
 LABEL=local.ksef-daily-fetch
@@ -34,8 +34,6 @@ print_plist() {
   <string>$REPO</string>
   <key>StartCalendarInterval</key>
   <dict>
-    <key>Hour</key>
-    <integer>8</integer>
     <key>Minute</key>
     <integer>0</integer>
   </dict>
@@ -62,7 +60,7 @@ case ${1:-} in
     plutil -lint "$PLIST" || exit 1
     launchctl bootout $DOMAIN/$LABEL 2>/dev/null || true
     launchctl bootstrap $DOMAIN "$PLIST" || exit 1
-    echo "Installed $LABEL: runs daily at 08:00."
+    echo "Installed $LABEL: runs every hour at minute 0, and once at wake after sleep."
     echo "Run it now: launchctl kickstart $DOMAIN/$LABEL"
     echo "Log: $LOG"
     ;;
