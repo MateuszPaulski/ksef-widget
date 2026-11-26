@@ -47,6 +47,12 @@ targets:
       - CoreTests/Support/TestClock.swift
     dependencies:
       - target: KsefCore
+  KsefAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [AppTests, App/SettingsView.swift]
+    dependencies:
+      - target: KsefCore
   KsefWidget:
     type: application
     platform: macOS
@@ -56,8 +62,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: local.ksef-daily-fetch.KsefWidget
         INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_CFBundleDisplayName: KSeF
-        CODE_SIGN_ENTITLEMENTS: App/App.entitlements
+        PRODUCT_NAME: KSeF
     dependencies:
+      - target: KsefCore
       - target: KsefWidgetExtension
   KsefWidgetExtension:
     type: app-extension
