@@ -12,13 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         installEditMenu()
         let state = model.settingsState
-        let configured: Bool
-        let verified: Bool
-        switch state {
-        case .missing: (configured, verified) = (false, false)
-        case .broken: (configured, verified) = (true, false)
-        case .ready(let settings): (configured, verified) = (true, settings.verified)
-        }
+        let configured = state.isConfigured
+        let verified = state.settings?.verified ?? false
         logger.notice(
             "launch configured=\(configured) verified=\(verified) legacyAgent=\(LegacyLaunchAgent.isInstalled(self.model.paths))"
         )
@@ -92,8 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // after a rebuild never appears inside an unattended run.
     private func prepareConfiguredLaunch(_ state: SettingsState) async {
         model.notificationsAllowed = await Notifier.isAuthorized()
-        var dataDir: String?
-        if case .ready(let settings) = state { dataDir = settings.dataDir }
+        let dataDir = state.settings?.dataDir
         let password = await Task.detached { () -> Result<String, Error> in
             if let dataDir {
                 let url = URL(fileURLWithPath: dataDir)
@@ -138,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func openInvoiceFolder() {
-        guard case .ready(let settings) = model.settingsState else { return }
+        guard let settings = model.settingsState.settings else { return }
         let url = URL(fileURLWithPath: settings.dataDir, isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         NSWorkspace.shared.open(url)
@@ -160,8 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             canFetch = settings.verified && !legacy && !model.gate.isRunning
         }
         let displayed: MenuState = model.gate.isRunning ? .running : legacy ? .legacyAgent : menuState
-        var configured = true
-        if case .missing = state { configured = false }
+        let configured = state.isConfigured
         return MenuContent(
             statusLine: menuStatusLine(displayed),
             showsNotificationWarning: configured && model.notificationsAllowed == false,

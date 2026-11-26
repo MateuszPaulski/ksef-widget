@@ -32,8 +32,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         refreshIcon()
     }
 
-    func refreshIcon() {
-        let symbol = content().showsWarningIcon ? "exclamationmark.triangle" : "doc.text"
+    func refreshIcon() { showIcon(warning: content().showsWarningIcon) }
+
+    private func showIcon(warning: Bool) {
+        let symbol = warning ? "exclamationmark.triangle" : "doc.text"
         statusItem.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "KSeF")
     }
 
@@ -55,7 +57,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Zakończ", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
-        refreshIcon()
+        showIcon(warning: content.showsWarningIcon)
     }
 
     private func disabled(_ title: String) -> NSMenuItem {

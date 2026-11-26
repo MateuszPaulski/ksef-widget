@@ -8,6 +8,14 @@ let logger = Logger(subsystem: "local.ksef-daily-fetch.app", category: "app")
 enum SettingsState {
     case missing, broken
     case ready(Settings)
+
+    var settings: Settings? {
+        if case .ready(let settings) = self { settings } else { nil }
+    }
+
+    var isConfigured: Bool {
+        if case .missing = self { false } else { true }
+    }
 }
 
 private struct SetupError: LocalizedError {

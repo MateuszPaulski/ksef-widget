@@ -3,6 +3,12 @@ import KsefCore
 import Observation
 import SwiftUI
 
+private extension SettingsMessage {
+    static let busy = SettingsMessage(text: "Trwa pobieranie — spróbuj za chwilę.", isError: true)
+
+    static func failure(_ error: Error) -> SettingsMessage { SettingsMessage(text: "Błąd: \(errorMessage(error))", isError: true) }
+}
+
 @MainActor @Observable
 private final class SettingsModel {
     var form: SettingsForm
@@ -85,14 +91,15 @@ final class SettingsWindowController {
         do {
             settings = try SettingsFile.load(app.paths.settings)
         } catch {
-            message = SettingsMessage(text: "Błąd: \(errorMessage(error))", isError: true)
+            message = .failure(error)
         }
+        let loginStatus = LoginItem.status
         return SettingsForm(
             nip: settings?.nip ?? "", environment: settings?.environment ?? .prod,
             startDate: startDate(fromText: settings?.startDate ?? defaultStartDateText(now: Date())) ?? Date(),
             dataDir: settings?.dataDir ?? app.paths.defaultDataDir.path, certificateName: nil, keyName: nil, password: "",
-            hasStoredCredentials: storedCredentialsExist(), startAtLogin: LoginItem.status == .enabled,
-            loginNeedsApproval: LoginItem.status == .requiresApproval,
+            hasStoredCredentials: storedCredentialsExist(), startAtLogin: loginStatus == .enabled,
+            loginNeedsApproval: loginStatus == .requiresApproval,
             notificationsAllowed: settings == nil ? nil : app.notificationsAllowed,
             legacyAgent: LegacyLaunchAgent.isInstalled(app.paths), message: message
         )
@@ -145,10 +152,10 @@ final class SettingsWindowController {
             nip: form.nip.trimmingCharacters(in: .whitespaces), environment: form.environment, startDate: startDateText(form.startDate),
             dataDir: form.dataDir, certificate: certificate, key: key, password: form.password
         )
-        let includesCredentials = draft.certificate != nil || draft.key != nil || !draft.password.isEmpty
+        let includesCredentials = draft.includesCredentials
         model.busy = true
         Task {
-            var message = SettingsMessage(text: "Trwa pobieranie — spróbuj za chwilę.", isError: true)
+            var message = SettingsMessage.busy
             _ = await app.gate.runIfIdle {
                 message = await performSave(draft, model: model)
                 if includesCredentials { app.forgetPassword() }
@@ -181,7 +188,7 @@ final class SettingsWindowController {
             model.form.notificationsAllowed = app.notificationsAllowed
             return SettingsMessage(text: saved.verified ? "Zapisano." : "Zapisano. Teraz naciśnij „Sprawdź połączenie”.", isError: false)
         } catch {
-            return SettingsMessage(text: "Błąd: \(errorMessage(error))", isError: true)
+            return .failure(error)
         }
     }
 
@@ -190,7 +197,7 @@ final class SettingsWindowController {
         model.busy = true
         model.form.message = SettingsMessage(text: "Sprawdzanie…", isError: false)
         Task {
-            var message = SettingsMessage(text: "Trwa pobieranie — spróbuj za chwilę.", isError: true)
+            var message = SettingsMessage.busy
             var verified = false
             _ = await app.gate.runIfIdle {
                 (message, verified) = await runCheck()
@@ -215,7 +222,7 @@ final class SettingsWindowController {
             }
             return (SettingsMessage(text: outcome.text, isError: outcome.isError), !outcome.isError)
         } catch {
-            return (SettingsMessage(text: "Błąd: \(errorMessage(error))", isError: true), false)
+            return (.failure(error), false)
         }
     }
 
@@ -228,7 +235,7 @@ final class SettingsWindowController {
                 try await Notifier.post("KSeF: test powiadomienia", "Powiadomienia działają.")
                 model.form.message = SettingsMessage(text: "Wysłano testowe powiadomienie.", isError: false)
             } catch {
-                model.form.message = SettingsMessage(text: "Błąd: \(errorMessage(error))", isError: true)
+                model.form.message = .failure(error)
             }
             app.notificationsAllowed = await Notifier.isAuthorized()
             model.form.notificationsAllowed = app.notificationsAllowed
@@ -242,9 +249,10 @@ final class SettingsWindowController {
         do {
             try LoginItem.setEnabled(enabled)
         } catch {
-            model.form.message = SettingsMessage(text: "Błąd: \(errorMessage(error))", isError: true)
+            model.form.message = .failure(error)
         }
-        model.form.startAtLogin = LoginItem.status == .enabled
-        model.form.loginNeedsApproval = LoginItem.status == .requiresApproval
+        let loginStatus = LoginItem.status
+        model.form.startAtLogin = loginStatus == .enabled
+        model.form.loginNeedsApproval = loginStatus == .requiresApproval
     }
 }

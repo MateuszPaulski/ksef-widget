@@ -23,6 +23,8 @@ public struct SettingsDraft: Sendable {
         self.key = key
         self.password = password
     }
+
+    public var includesCredentials: Bool { certificate != nil || key != nil || !password.isEmpty }
 }
 
 /// The save flow of the settings window. With new credentials the order is: validate the pair, create the data folder,
@@ -37,8 +39,7 @@ public func saveSettings(
     try settings.validate(today: today)
     let createDataDir = { try FileManager.default.createDirectory(at: URL(fileURLWithPath: draft.dataDir), withIntermediateDirectories: true) }
 
-    let enteredCredentials = draft.certificate != nil || draft.key != nil || !draft.password.isEmpty
-    if enteredCredentials {
+    if draft.includesCredentials {
         guard let certificate = draft.certificate, let key = draft.key, !draft.password.isEmpty else {
             throw KsefError(missingCredentialInputs)
         }
