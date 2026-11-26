@@ -24,3 +24,28 @@ targets:
     type: bundle.unit-test
     platform: macOS
     sources: [Tests, Shared]
+  KsefWidget:
+    type: application
+    platform: macOS
+    sources: [App, Shared/KsefLink.swift]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.ksef-daily-fetch.KsefWidget
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_CFBundleDisplayName: KSeF
+        CODE_SIGN_ENTITLEMENTS: App/App.entitlements
+    dependencies:
+      - target: KsefWidgetExtension
+  KsefWidgetExtension:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Extension
+        excludes: ["Info.plist", "*.entitlements"]
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.ksef-daily-fetch.KsefWidget.Extension
+        INFOPLIST_FILE: Extension/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: KSeF
+        CODE_SIGN_ENTITLEMENTS: Extension/Extension.entitlements
