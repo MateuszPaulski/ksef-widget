@@ -22,10 +22,6 @@ final class WidgetSnapshotTests: XCTestCase {
         try temporaryDirectory().appendingPathComponent("a/b/widget.json")
     }
 
-    private func jsonObject(_ url: URL) throws -> [String: Any] {
-        try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
-    }
-
     func testWidgetInvoiceMapsAnIndexEntryForDisplay() {
         XCTAssertEqual(
             widgetInvoice(entry(1, "2026-11-26T13:00:39.000Z"), .prod),

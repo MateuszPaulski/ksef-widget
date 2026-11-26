@@ -6,7 +6,6 @@ final class PrivateKeyTests: XCTestCase {
 
     func testDecryptsEverySupportedFixtureKey() throws {
         let fixture = try Fixtures.json("keys.json", as: KeysFixture.self)
-        let dir = try temporaryDirectory()
         for entry in fixture.keys where entry.expect == "ok" {
             let key = try decryptPrivateKey(pem: entry.keyPem, password: entry.password)
             switch (key, entry.certificate) {
@@ -14,12 +13,9 @@ final class PrivateKeyTests: XCTestCase {
             default: XCTFail("\(entry.name): wrong key kind \(key)")
             }
 
-            let certificateURL = dir.appendingPathComponent("\(entry.name).crt")
-            let keyURL = dir.appendingPathComponent("\(entry.name).key")
-            try XCTUnwrap(fixture.certificates[entry.certificate]).write(to: certificateURL, atomically: true, encoding: .utf8)
-            try entry.keyPem.write(to: keyURL, atomically: true, encoding: .utf8)
+            let certificatePem = try XCTUnwrap(fixture.certificates[entry.certificate])
             XCTAssertNoThrow(
-                try loadCredentials(certificateURL: certificateURL, keyURL: keyURL, password: entry.password),
+                try loadCredentials(certificatePem: certificatePem, keyPem: entry.keyPem, password: entry.password),
                 entry.name
             )
         }

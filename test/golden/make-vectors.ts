@@ -125,13 +125,13 @@ async function keyVectors(dir: string, outDir: string): Promise<void> {
   for (const kind of ['rsa', 'ec'] as const) {
     await writeFile(join(dir, `${kind}.in.key`), base[kind].keyPem);
   }
-  const ecPassword = (): string => randomBytes(12).toString('hex');
+  const newPassword = (): string => randomBytes(12).toString('hex');
   const keys: unknown[] = [
     { name: 'libressl-sha1-aes256-rsa', certificate: 'rsa', keyPem: rsa.keyPem, password: rsa.password, expect: 'ok' },
     { name: 'libressl-sha1-aes256-ec', certificate: 'ec', keyPem: ec.keyPem, password: ec.password, expect: 'ok' },
   ];
 
-  const aes128Password = ecPassword();
+  const aes128Password = newPassword();
   keys.push({
     name: 'libressl-sha1-aes128-ec',
     certificate: 'ec',
@@ -146,11 +146,11 @@ async function keyVectors(dir: string, outDir: string): Promise<void> {
     ['node-sha256-aes256-ec', 'ec', 'aes-256-cbc'],
   ];
   for (const [name, kind, cipher] of nodeVariants) {
-    const password = ecPassword();
+    const password = newPassword();
     keys.push({ name, certificate: kind, keyPem: nodeExport(kind, cipher, password), password, expect: 'ok' });
   }
 
-  const pbes1Password = ecPassword();
+  const pbes1Password = newPassword();
   keys.push({
     name: 'pbes1-3des-ec',
     certificate: 'ec',

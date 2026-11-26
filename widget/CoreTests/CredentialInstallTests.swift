@@ -16,12 +16,6 @@ final class CredentialInstallTests: XCTestCase {
         files = try TestCredentials.make(nip: randomNip(), keyType: .rsa, in: source)
     }
 
-    private func permissions(_ url: URL) throws -> Int {
-        try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int)
-    }
-
-    private func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
-
     private func install(_ files: TestCredentialFiles, password: String? = nil, secrets: FakeSecretStore) throws {
         try installCredentials(
             certificate: files.certificateURL, key: files.keyURL, password: password ?? files.password, paths: paths, secrets: secrets

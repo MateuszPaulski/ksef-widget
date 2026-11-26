@@ -16,13 +16,9 @@ final class StoreTests: XCTestCase {
         try temporaryDirectory().appendingPathComponent("data")
     }
 
-    private func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
-
     private func names(in url: URL) throws -> [String] {
         try FileManager.default.contentsOfDirectory(atPath: url.path).sorted()
     }
-
-    private func text(_ url: URL) throws -> String { try String(contentsOf: url, encoding: .utf8) }
 
     private func open(_ dir: URL, at time: Date? = nil) throws -> Store {
         let moment = time ?? now

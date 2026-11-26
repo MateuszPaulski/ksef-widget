@@ -142,8 +142,4 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(paths.defaultDataDir.path, "/tmp/home/Documents/KSeF")
         XCTAssertEqual(paths.legacyLaunchAgent.path, "/tmp/home/Library/LaunchAgents/local.ksef-daily-fetch.plist")
     }
-
-    private func permissions(_ url: URL) throws -> Int {
-        try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int)
-    }
 }

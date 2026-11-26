@@ -11,16 +11,11 @@ private func sha256(_ bytes: Data) -> String {
     Data(SHA256.hash(data: bytes)).base64EncodedString()
 }
 
-private struct Fake {
-    let metadata: InvoiceMetadata
-    let xml: Data
-}
-
-private func makeInvoice(_ n: Int, ksefNumber: String? = nil, issueDate: String = "2026-11-20", hash: String? = nil) -> Fake {
+private func makeInvoice(_ n: Int, ksefNumber: String? = nil, issueDate: String = "2026-11-20", hash: String? = nil) -> FakeInvoice {
     let xml = Data("<Faktura>\(n)</Faktura>".utf8)
     let hex = String(format: "%06X", n)
     let minute = String(format: "%02d", n % 60)
-    return Fake(
+    return FakeInvoice(
         metadata: InvoiceMetadata(
             ksefNumber: ksefNumber ?? "5265877635-20261120-\(hex)123456-AB", invoiceNumber: "FV/\(n)", issueDate: issueDate,
             permanentStorageDate: "2026-11-20T09:\(minute):00.1234567+00:00", seller: Seller(nip: "1111111111", name: "Sprzedawca"),
@@ -78,7 +73,7 @@ private final class Harness {
     var sleeps: [Int] { clock.sleeps }
 
     init(
-        query: @escaping Query, invoices: [Fake] = [], alreadySaved: [String] = [], earlierSaves: [Int64] = [],
+        query: @escaping Query, invoices: [FakeInvoice] = [], alreadySaved: [String] = [], earlierSaves: [Int64] = [],
         from: String = defaultFrom, tokenValidUntil: String? = nil,
         download: (@Sendable (String) async throws -> Data)? = nil
     ) {

@@ -56,19 +56,14 @@ final class XadesTests: XCTestCase {
     }
 
     private func fixtureCredentials(_ vector: XadesVector) throws -> Credentials {
-        let dir = try temporaryDirectory()
-        let certificateURL = dir.appendingPathComponent("certificate.crt")
-        let keyURL = dir.appendingPathComponent("key.key")
-        try vector.certificatePem.write(to: certificateURL, atomically: true, encoding: .utf8)
-        try vector.keyPem.write(to: keyURL, atomically: true, encoding: .utf8)
-        return try loadCredentials(certificateURL: certificateURL, keyURL: keyURL, password: vector.password)
+        try loadCredentials(certificatePem: vector.certificatePem, keyPem: vector.keyPem, password: vector.password)
     }
 
     private func sign(_ vector: XadesVector) throws -> String {
         let time = try XCTUnwrap(KsefTime.millis(vector.signingTime))
         return try signXades(
             challenge: vector.challenge, nip: vector.contextNip,
-            credentials: fixtureCredentials(vector), signingTime: Date(timeIntervalSince1970: Double(time) / 1000)
+            credentials: fixtureCredentials(vector), signingTime: KsefTime.date(millis: time)
         )
     }
 

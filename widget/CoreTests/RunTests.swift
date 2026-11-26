@@ -48,16 +48,8 @@ final class RunTests: XCTestCase {
         return Rig(options: options, fake: fake, clock: clock, dataDir: dataDir, snapshotURL: snapshotURL, notifications: notifications, logs: logs)
     }
 
-    private func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
-
-    private func text(_ url: URL) throws -> String { try String(contentsOf: url, encoding: .utf8) }
-
     private func reportURL(_ dataDir: URL) -> URL {
         dataDir.appendingPathComponent("reports/\(warsawDay(START)).md")
-    }
-
-    private func snapshot(_ url: URL) throws -> [String: Any] {
-        try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
     }
 
     private func indexLines(_ dataDir: URL) throws -> [String] {
@@ -65,7 +57,7 @@ final class RunTests: XCTestCase {
     }
 
     private func state(_ dataDir: URL) throws -> NSDictionary {
-        try snapshot(dataDir.appendingPathComponent("state.json")) as NSDictionary
+        try jsonObject(dataDir.appendingPathComponent("state.json")) as NSDictionary
     }
 
     func testSavesNewInvoicesReportsAndNotifiesOnce() async throws {
@@ -225,7 +217,7 @@ final class RunTests: XCTestCase {
 
         _ = await KsefCore.run(r.options)
 
-        let written = try snapshot(r.snapshotURL)
+        let written = try jsonObject(r.snapshotURL)
         XCTAssertEqual(written["status"] as? String, "complete")
         XCTAssertNil(written["reason"])
         XCTAssertEqual(written["today"] as? String, warsawDay(START))
@@ -244,7 +236,7 @@ final class RunTests: XCTestCase {
 
         _ = await KsefCore.run(r.options)
 
-        let written = try snapshot(r.snapshotURL)
+        let written = try jsonObject(r.snapshotURL)
         XCTAssertEqual(written["status"] as? String, "complete")
         XCTAssertEqual((written["invoices"] as? [Any])?.count, 2)
     }
@@ -254,7 +246,7 @@ final class RunTests: XCTestCase {
 
         _ = await KsefCore.run(r.options)
 
-        let written = try snapshot(r.snapshotURL)
+        let written = try jsonObject(r.snapshotURL)
         XCTAssertEqual(written["status"] as? String, "failed")
         XCTAssertTrue((written["reason"] as? String ?? "").hasPrefix("Uwierzytelnienie w KSeF nieudane (kod 460"))
         XCTAssertEqual((written["invoices"] as? [Any])?.count, 0)
@@ -270,7 +262,7 @@ final class RunTests: XCTestCase {
 
         XCTAssertEqual(summary.status, .failed)
         XCTAssertEqual(summary.reason, "Uszkodzony plik index.jsonl, linia 1")
-        let written = try snapshot(r.snapshotURL)
+        let written = try jsonObject(r.snapshotURL)
         XCTAssertEqual(written["status"] as? String, "failed")
         XCTAssertEqual(written["reason"] as? String, "Uszkodzony plik index.jsonl, linia 1")
         XCTAssertEqual((written["invoices"] as? [Any])?.count, 0)
@@ -289,7 +281,7 @@ final class RunTests: XCTestCase {
 
         XCTAssertEqual(r.notifications.value.count, 1)
         XCTAssertEqual(try reportSections(r.dataDir), 2)
-        XCTAssertEqual(try snapshot(r.snapshotURL)["status"] as? String, "failed")
+        XCTAssertEqual(try jsonObject(r.snapshotURL)["status"] as? String, "failed")
         XCTAssertEqual(r.logs.value.filter { $0.contains("repeated failure, notification skipped") }.count, 1)
     }
 
@@ -324,7 +316,7 @@ final class RunTests: XCTestCase {
 
         XCTAssertEqual(first.notifications.value.count, 1)
         XCTAssertEqual(second.notifications.value.count, 0)
-        let written = try snapshot(first.snapshotURL)
+        let written = try jsonObject(first.snapshotURL)
         XCTAssertEqual(written["failureKey"] as? String, "KSeF 500")
         XCTAssertTrue((written["reason"] as? String ?? "").contains("BBBBBBBBBB"))
     }
@@ -338,7 +330,7 @@ final class RunTests: XCTestCase {
 
         XCTAssertEqual(first.notifications.value.count, 1)
         XCTAssertEqual(second.notifications.value.count, 1)
-        XCTAssertEqual(try snapshot(first.snapshotURL)["failureKey"] as? String, "KSeF 401")
+        XCTAssertEqual(try jsonObject(first.snapshotURL)["failureKey"] as? String, "KSeF 401")
     }
 
     func testAPreviousFailedSnapshotWithoutFailureKeyNotifies() async throws {
@@ -382,7 +374,7 @@ final class RunTests: XCTestCase {
         _ = await KsefCore.run(r.options)
 
         XCTAssertEqual(r.notifications.value.count, 1)
-        XCTAssertEqual(try snapshot(r.snapshotURL)["status"] as? String, "failed")
+        XCTAssertEqual(try jsonObject(r.snapshotURL)["status"] as? String, "failed")
     }
 
     func testARepeatedFailureThatSavedNewInvoicesStillNotifies() async {
@@ -432,7 +424,7 @@ final class RunTests: XCTestCase {
         XCTAssertEqual(requests, 0)
         XCTAssertEqual(r.notifications.value.count, 1)
         XCTAssertTrue(try text(reportURL(r.dataDir)).contains("BŁĄD — Folder faktur zawiera dane innego podatnika"))
-        XCTAssertEqual(try snapshot(r.snapshotURL)["status"] as? String, "failed")
+        XCTAssertEqual(try jsonObject(r.snapshotURL)["status"] as? String, "failed")
         XCTAssertFalse(exists(r.dataDir.appendingPathComponent("index.jsonl")))
         XCTAssertFalse(exists(r.dataDir.appendingPathComponent("state.json")))
     }
@@ -517,7 +509,7 @@ final class RunTests: XCTestCase {
         XCTAssertEqual(notifications.value.count, 1)
         XCTAssertEqual(notifications.value[0].title, "KSeF: błąd pobierania faktur")
         XCTAssertEqual(notifications.value[0].message, setupMessage)
-        let written = try snapshot(url)
+        let written = try jsonObject(url)
         XCTAssertEqual(written["status"] as? String, "failed")
         XCTAssertEqual(written["reason"] as? String, setupMessage)
         XCTAssertEqual(written["failureKey"] as? String, setupMessage)

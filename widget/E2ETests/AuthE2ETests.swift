@@ -12,10 +12,7 @@ final class AuthE2ETests: XCTestCase {
     }
 
     private func authenticateRandomNip(keyType: KeyType) async throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ksef-e2e-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-
+        let dir = try temporaryDirectory()
         let nip = randomNip()
         let files = try TestCredentials.make(nip: nip, keyType: keyType, in: dir)
         let credentials = try loadCredentials(certificateURL: files.certificateURL, keyURL: files.keyURL, password: files.password)

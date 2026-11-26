@@ -53,8 +53,6 @@ final class SettingsSaveTests: XCTestCase {
         try saveSettings(draft, previous: previous, paths: paths, secrets: secrets, today: today)
     }
 
-    private func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
-
     private func message(_ body: () throws -> Void) -> String? {
         do {
             try body()

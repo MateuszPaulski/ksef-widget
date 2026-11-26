@@ -83,4 +83,16 @@ extension XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(at: url) }
         return url
     }
+
+    func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
+
+    func text(_ url: URL) throws -> String { try String(contentsOf: url, encoding: .utf8) }
+
+    func permissions(_ url: URL) throws -> Int {
+        try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int)
+    }
+
+    func jsonObject(_ url: URL) throws -> [String: Any] {
+        try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    }
 }
