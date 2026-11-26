@@ -43,6 +43,8 @@ targets:
       - E2ETests
       - CoreTests/Support/TestCredentials.swift
       - CoreTests/Support/RandomNip.swift
+      - CoreTests/Support/Fixtures.swift
+      - CoreTests/Support/TestClock.swift
     dependencies:
       - target: KsefCore
   KsefWidget:
