@@ -7,3 +7,5 @@ config.json
 *.p12
 .DS_Store
 .claude/
+widget/*.xcodeproj/
+widget/build/
