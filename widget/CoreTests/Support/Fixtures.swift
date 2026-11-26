@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+@testable import KsefCore
 
 enum Fixtures {
     static func json<T: Decodable>(_ name: String, as type: T.Type) throws -> T {
@@ -42,6 +43,37 @@ struct KeysFixture: Decodable {
 
     let certificates: [String: String]
     let keys: [Entry]
+}
+
+struct FormatsFixture: Decodable {
+    struct Notification: Decodable, Equatable {
+        let title: String
+        let message: String
+    }
+
+    struct Amount: Decodable {
+        let value: Double
+        let text: String
+
+        init(from decoder: Decoder) throws {
+            var container = try decoder.unkeyedContainer()
+            value = try container.decode(Double.self)
+            text = try container.decode(String.self)
+        }
+    }
+
+    let now: String
+    let invoices: [InvoiceMetadata]
+    let indexLines: [String]
+    let stateJson: String
+    let reportFile: String
+    let notifications: [Notification]
+    let snapshotJson: String
+    let amounts: [Amount]
+
+    static func load() throws -> FormatsFixture {
+        try Fixtures.json("formats.json", as: FormatsFixture.self)
+    }
 }
 
 extension XCTestCase {

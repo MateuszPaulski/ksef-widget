@@ -11,12 +11,12 @@ struct AccessToken: Decodable, Equatable, Sendable {
     let validUntil: String
 }
 
-struct Seller: Codable, Equatable, Sendable {
+public struct Seller: Codable, Equatable, Sendable {
     let nip: String
     let name: String?
 }
 
-struct InvoiceMetadata: Codable, Equatable, Sendable {
+public struct InvoiceMetadata: Codable, Equatable, Sendable {
     let ksefNumber: String
     let invoiceNumber: String
     let issueDate: String  // YYYY-MM-DD
