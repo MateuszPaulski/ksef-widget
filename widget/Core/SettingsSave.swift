@@ -63,6 +63,9 @@ public func startDate(fromText text: String) -> Date? {
 
 public func startDateText(_ date: Date) -> String { warsawDay(date) }
 
+/// The UTC day, not the Warsaw one: a sync starts at `<date>T00:00:00Z` and KSeF rejects a `from` in the future.
+public func defaultStartDateText(now: Date) -> String { String(KsefTime.iso(now).prefix(10)) }
+
 public func connectionCheckResult(_ summary: RunSummary) -> (text: String, isError: Bool) {
     if summary.status == .failed { return ("Błąd: \(summary.reason ?? "nieznany błąd")", true) }
     guard let counts = summary.checked else { return ("Połączenie działa.", false) }

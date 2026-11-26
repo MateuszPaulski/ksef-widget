@@ -89,7 +89,7 @@ final class SettingsWindowController {
         }
         return SettingsForm(
             nip: settings?.nip ?? "", environment: settings?.environment ?? .prod,
-            startDate: settings.flatMap { startDate(fromText: $0.startDate) } ?? Date(),
+            startDate: startDate(fromText: settings?.startDate ?? defaultStartDateText(now: Date())) ?? Date(),
             dataDir: settings?.dataDir ?? app.paths.defaultDataDir.path, certificateName: nil, keyName: nil, password: "",
             hasStoredCredentials: storedCredentialsExist(), startAtLogin: LoginItem.status == .enabled,
             loginNeedsApproval: LoginItem.status == .requiresApproval,

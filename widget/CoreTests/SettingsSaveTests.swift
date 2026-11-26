@@ -132,6 +132,17 @@ final class SettingsSaveTests: XCTestCase {
         XCTAssertNil(startDate(fromText: "garbage"))
     }
 
+    func testDefaultStartDateIsTheUtcDayAndPassesValidation() throws {
+        let justAfterWarsawMidnight = instant("2026-11-26T23:30:00Z")
+        let text = defaultStartDateText(now: justAfterWarsawMidnight)
+
+        XCTAssertEqual(text, "2026-11-26")
+        let settings = Settings(nip: "5265877635", environment: .prod, startDate: text, dataDir: "/tmp/x", verified: false)
+        XCTAssertNoThrow(try settings.validate(today: justAfterWarsawMidnight))
+        XCTAssertEqual(startDateText(try XCTUnwrap(startDate(fromText: text))), text)
+        XCTAssertEqual(defaultStartDateText(now: instant("2026-11-27T00:00:00Z")), "2026-11-27")
+    }
+
     func testConnectionCheckTexts() {
         let counts = DryRunCounts(listed: 3, notSaved: 1)
         let ok = RunSummary(startedAt: today, status: .complete, reason: nil, failureKey: nil, saved: [], checked: counts)
