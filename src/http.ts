@@ -1,5 +1,28 @@
-const REQUEST_TIMEOUT_MS = 60_000;
+export const MAX_RETRY_AFTER_SECONDS = 120;
+export const MAX_RATE_LIMIT_RETRIES = 3;
+export const NETWORK_RETRIES = 3;
+export const NETWORK_RETRY_DELAY_MS = 30_000;
+export const REQUEST_TIMEOUT_MS = 60_000;
+const DEFAULT_RETRY_AFTER_SECONDS = 60;
+// A Retry-After we cannot parse is treated as a long wait (the hourly limits are the usual cause).
+const UNPARSEABLE_RETRY_AFTER_SECONDS = 3600;
 const BODY_EXCERPT_CHARS = 300;
+
+export class RateLimitError extends Error {
+  readonly retryAfterSeconds: number;
+
+  constructor(retryAfterSeconds: number) {
+    super(`Limit zapytań KSeF — trzeba odczekać ${retryAfterSeconds} s.`);
+    this.name = 'RateLimitError';
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+function retryAfterSeconds(response: Response): number {
+  const header = response.headers.get('Retry-After');
+  if (header === null) return DEFAULT_RETRY_AFTER_SECONDS;
+  return /^\d+$/.test(header.trim()) ? Number(header) : UNPARSEABLE_RETRY_AFTER_SECONDS;
+}
 
 export class KsefApiError extends Error {
   readonly status: number;
@@ -43,15 +66,38 @@ export function createHttp(apiBase: string, deps: HttpDeps): Http {
       headers['Content-Type'] = 'application/xml';
       body = options.xml;
     }
-    const response = await deps.fetch(apiBase + path, {
-      method,
-      headers,
-      body,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-    if (!response.ok) {
-      throw new KsefApiError(response.status, method, path, await response.text());
+    let rateLimitRetries = 0;
+    let networkRetries = 0;
+    for (;;) {
+      let response: Response;
+      try {
+        response = await deps.fetch(apiBase + path, {
+          method,
+          headers,
+          body,
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        });
+      } catch (err) {
+        if (networkRetries === NETWORK_RETRIES) {
+          throw new Error(`Brak połączenia z KSeF: ${err instanceof Error ? err.message : String(err)}`);
+        }
+        networkRetries++;
+        await deps.sleep(NETWORK_RETRY_DELAY_MS);
+        continue;
+      }
+      if (response.status === 429) {
+        const seconds = retryAfterSeconds(response);
+        if (seconds > MAX_RETRY_AFTER_SECONDS || rateLimitRetries === MAX_RATE_LIMIT_RETRIES) {
+          throw new RateLimitError(seconds);
+        }
+        rateLimitRetries++;
+        await deps.sleep(seconds * 1000);
+        continue;
+      }
+      if (!response.ok) {
+        throw new KsefApiError(response.status, method, path, await response.text());
+      }
+      return response;
     }
-    return response;
   };
 }
