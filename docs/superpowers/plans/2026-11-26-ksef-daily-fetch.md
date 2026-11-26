@@ -441,11 +441,12 @@ loop:
     bytes = download(ksefNumber)                            // RateLimitError → partial
     if sha256(bytes).base64 !== invoice.invoiceHash: throw
     store.saveInvoice(invoice, bytes); onSaved(invoice); downloads++
-  if window.to !== undefined and (hwm === null or Date.parse(hwm) > Date.parse(window.to)): throw
+  if window.to !== undefined and hwm === null: throw        // closed window must report an HWM
   if hwm === null: return complete                          // open window: checkpoint unchanged
-  store.writeCheckpoint(hwm)
-  if window.to === undefined or hwm === from: return complete
-  from = hwm
+  next = (window.to !== undefined and Date.parse(hwm) > Date.parse(window.to)) ? window.to : hwm
+  store.writeCheckpoint(next)                               // an HWM past a closed window's `to` settles only up to `to`
+  if window.to === undefined or next === from: return complete
+  from = next
 ```
 `nextWindow`: `to = new Date(Date.parse(from) + MAX_WINDOW_DAYS * 86_400_000).toISOString()` only if that instant is before `now`; otherwise no `to`. `from` is passed through unchanged.
 `listWindow`: page from `pageOffset = 0`; collect; stop when `!hasMore`; if `isTruncated`, continue with `from` = last invoice's `permanentStorageDate` and `pageOffset = 0`, else `pageOffset + 1`; dedupe by `ksefNumber` keeping first occurrence; `hwm` = last page's `permanentStorageHwmDate ?? null`. A `KsefApiError` with `status === 400` whose `body` contains `21183` → `{ invoices: [], hwm: null }`; any other error propagates.
@@ -467,7 +468,8 @@ Polish texts: cap → `Limit 60 pobrań na jedno uruchomienie.`; token → `Toke
 - `hostile ksefNumber is rejected before download`: `ksefNumber: '../../etc/passwd'` → rejects with the pattern message; `download` and `saveInvoice` not called.
 - `hostile issueDate is rejected before download`: `issueDate: '../../x'` → rejects with the issue-date message; `download` and `saveInvoice` not called.
 - `null HWM on the open window keeps the checkpoint`: hwm `null`, no `to` → `complete`, no `writeCheckpoint`.
-- `closed window must report its HWM`: window with `to`, hwm `null` → rejects with the closed-window message; hwm one day after `to` → rejects likewise; no `writeCheckpoint` in either case.
+- `closed window must report its HWM`: window with `to`, hwm `null` → rejects with the closed-window message; no `writeCheckpoint`.
+- `closed window with an HWM past its end settles up to its end`: hwm one day after `to` → `writeCheckpoint(to)`, then the loop continues from `to` with the next window.
 
 Run: `pnpm test` → FAIL.
 
