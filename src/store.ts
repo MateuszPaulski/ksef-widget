@@ -9,6 +9,20 @@ export interface Store {
   writeCheckpoint(value: string): Promise<void>;
 }
 
+export interface IndexEntry {
+  ksefNumber: string;
+  invoiceNumber: string;
+  issueDate: string;
+  sellerNip: string;
+  sellerName: string | null;
+  grossAmount: number;
+  currency: string;
+  permanentStorageDate: string;
+  invoiceHash: string;
+  file: string;
+  savedAt: string;
+}
+
 function hasCode(err: unknown, code: string): boolean {
   return err instanceof Error && 'code' in err && err.code === code;
 }
@@ -22,11 +36,29 @@ async function readIfExists(path: string): Promise<string | null> {
   }
 }
 
-async function writeAtomic(target: string, data: string | Buffer): Promise<void> {
+export async function writeAtomic(target: string, data: string | Buffer): Promise<void> {
   await mkdir(dirname(target), { recursive: true });
   const temp = `${target}.tmp`;
   await writeFile(temp, data);
   await rename(temp, target);
+}
+
+export async function readIndex(dataDir: string): Promise<IndexEntry[]> {
+  const index = await readIfExists(join(dataDir, 'index.jsonl'));
+  const entries: IndexEntry[] = [];
+  if (index !== null) {
+    index.split('\n').forEach((line, i) => {
+      if (line === '') return;
+      try {
+        const entry = JSON.parse(line) as IndexEntry;
+        if (typeof entry.ksefNumber !== 'string') throw new Error('missing ksefNumber');
+        entries.push(entry);
+      } catch {
+        throw new Error(`Uszkodzony plik index.jsonl, linia ${i + 1}`);
+      }
+    });
+  }
+  return entries;
 }
 
 export async function openStore(dataDir: string, now: () => Date): Promise<Store> {
@@ -39,20 +71,7 @@ export async function openStore(dataDir: string, now: () => Date): Promise<Store
     checkpoint = value;
   }
 
-  const saved = new Set<string>();
-  const index = await readIfExists(join(dataDir, 'index.jsonl'));
-  if (index !== null) {
-    index.split('\n').forEach((line, i) => {
-      if (line === '') return;
-      try {
-        const ksefNumber = (JSON.parse(line) as { ksefNumber?: unknown }).ksefNumber;
-        if (typeof ksefNumber !== 'string') throw new Error('missing ksefNumber');
-        saved.add(ksefNumber);
-      } catch {
-        throw new Error(`Uszkodzony plik index.jsonl, linia ${i + 1}`);
-      }
-    });
-  }
+  const saved = new Set((await readIndex(dataDir)).map((entry) => entry.ksefNumber));
 
   return {
     get checkpoint() {
@@ -63,7 +82,7 @@ export async function openStore(dataDir: string, now: () => Date): Promise<Store
       const [year, month] = invoice.issueDate.split('-');
       const file = `invoices/${year}/${month}/${invoice.ksefNumber}.xml`;
       await writeAtomic(join(dataDir, file), xml);
-      const line = {
+      const line: IndexEntry = {
         ksefNumber: invoice.ksefNumber,
         invoiceNumber: invoice.invoiceNumber,
         issueDate: invoice.issueDate,

@@ -29,7 +29,10 @@ function reverseDate(issueDate: string, separator: string): string {
   return issueDate.split('-').reverse().join(separator);
 }
 
-export function invoiceViewUrl(environment: Environment, invoice: InvoiceMetadata): string {
+export function invoiceViewUrl(
+  environment: Environment,
+  invoice: Pick<InvoiceMetadata, 'seller' | 'issueDate' | 'invoiceHash'>,
+): string {
   const hash = invoice.invoiceHash.replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
   return `${ENVIRONMENTS[environment].qrBase}/invoice/${invoice.seller.nip}/${reverseDate(invoice.issueDate, '-')}/${hash}`;
 }
@@ -49,7 +52,7 @@ export function warsawDay(date: Date): string {
   return dayFormat.format(date);
 }
 
-function sellerLabel(invoice: InvoiceMetadata): string {
+export function sellerLabel(invoice: Pick<InvoiceMetadata, 'seller'>): string {
   return invoice.seller.name ? invoice.seller.name : `NIP ${invoice.seller.nip}`;
 }
 

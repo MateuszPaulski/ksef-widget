@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import type { InvoiceMetadata } from '../../src/ksef.ts';
-import { appendReport, openStore } from '../../src/store.ts';
+import { appendReport, openStore, readIndex } from '../../src/store.ts';
 
 const NOW = new Date('2026-11-26T08:00:12.345Z');
 const KSEF_NUMBER = '5265877635-20261120-0123456789AB-CD';
@@ -105,6 +105,30 @@ describe('store', () => {
     await mkdir(dataDir, { recursive: true });
     await writeFile(join(dataDir, 'index.jsonl'), `{"ksefNumber":"${KSEF_NUMBER}"}\n{"ksefNumber":\n`);
     await assert.rejects(openStore(dataDir, () => NOW), { message: 'Uszkodzony plik index.jsonl, linia 2' });
+  });
+
+  it('readIndex returns entries in file order', async () => {
+    const store = await openStore(dataDir, () => NOW);
+    await store.saveInvoice(invoice, Buffer.from('x'));
+    await store.saveInvoice({ ...invoice, ksefNumber: 'second' }, Buffer.from('y'));
+
+    const entries = await readIndex(dataDir);
+
+    assert.equal(entries.length, 2);
+    assert.equal(entries[0]?.ksefNumber, KSEF_NUMBER);
+    assert.equal(entries[1]?.ksefNumber, 'second');
+    assert.equal(entries[0]?.savedAt, NOW.toISOString());
+  });
+
+  it('readIndex of a missing index is empty', async () => {
+    assert.deepEqual(await readIndex(dataDir), []);
+    assert.equal(await exists(dataDir), false);
+  });
+
+  it('readIndex fails loudly on a corrupt line', async () => {
+    await mkdir(dataDir, { recursive: true });
+    await writeFile(join(dataDir, 'index.jsonl'), `{"ksefNumber":"${KSEF_NUMBER}"}\n{"ksefNumber":\n`);
+    await assert.rejects(readIndex(dataDir), { message: 'Uszkodzony plik index.jsonl, linia 2' });
   });
 
   it('appendReport appends, never overwrites', async () => {
