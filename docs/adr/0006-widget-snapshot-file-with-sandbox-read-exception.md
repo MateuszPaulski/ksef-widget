@@ -5,7 +5,7 @@ Status: accepted
 
 ## Context
 
-The widget extension must run in the App Sandbox; the fetcher is a non-sandboxed Homebrew `node` process started hourly by launchd, with no UI. Options checked on macOS 27 (spec section 5):
+The widget extension must run in the App Sandbox; the fetcher is a non-sandboxed third-party `node` process started hourly by launchd, with no UI. Options considered on macOS 27 (spec section 5); the first two are judged from Apple DTS forum posts, not probed:
 
 - An App Group container: since macOS 15 a process must claim the group in its entitlements to access the container, otherwise the user is prompted and consent lasts one process lifetime. Node claims nothing, so every run would be prompted or denied.
 - Writing into the widget's own container under `~/Library/Containers`: the same per-process "access data from other apps" consent.
