@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Work only in this worktree. Never push, never add a remote. Run each `git` command on its own (not chained with other commands).
+- Work only in this worktree. Never push, never add a remote. Run each `git` command on its own. The harness may refuse compound shell commands (`&&`, `;`, pipes mixing tools); if it does, split the command into separate calls with the same effect.
 - Coding guidelines: think first and state assumptions; minimum code; no unrequested features, no single-use abstractions, no speculative flexibility, no handling for impossible cases; surgical changes to existing files (match their style, do not refactor adjacent code); every task ends with a verifiable check.
 - TypeScript: run with `node <file>.ts`, erasable syntax only, relative imports end in `.ts`, type-only imports use `import type`. No new npm packages.
 - Swift: no third-party packages, no Swift Package Manager dependencies. `SWIFT_VERSION` 6.0, deployment target macOS 14.0. All `xcodebuild` calls use `-destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build`.
@@ -332,9 +332,9 @@ Rules (spec 7.4, 7.5), all times in Europe/Warsaw (`Calendar(identifier: .gregor
 - `KsefLink.hosts = ["qr.ksef.mf.gov.pl", "qr-test.ksef.mf.gov.pl", "qr-demo.ksef.mf.gov.pl"]`; `isAllowed` = scheme `https` and `url.host` (exact) in `hosts` and no user/password.
 - `title`: `KSeF · zaktualizowano HH:mm` from `updatedAt`; `KSeF` on `.failure`.
 - `newToday`: `newTodayLabel(savedToday)` when `savedToday > 0` and `snapshot.today` equals the Warsaw date of `now` (`yyyy-MM-dd`); else `nil`. `newTodayLabel`: 1 → `1 nowa dziś`; `n % 10` in 2…4 and `n % 100` not in 12…14 → `N nowe dziś`; otherwise `N nowych dziś`.
-- `banner` (first match): `.missing` → `Brak danych — pobieranie jeszcze nie zapisało stanu widżetu.` (error); `.unreadable(m)` → `Nie można odczytać danych widżetu: m` (error); `now − updatedAt > staleAfter` → `Dane nieaktualne — ostatnia aktualizacja DD.MM HH:mm` (error); `failed` → `Błąd pobierania: <reason ?? "">` (error); `partial` → `Pobrano częściowo — reszta przy następnym uruchomieniu.` (warning); else `nil`.
+- `banner` (first match): `.missing` → `Brak danych — pobieranie jeszcze nie zapisało stanu widżetu.` (error); `.unreadable(m)` → `Nie można odczytać danych widżetu: m` (error); `now − updatedAt >= staleAfter` → `Dane nieaktualne — ostatnia aktualizacja DD.MM HH:mm` (error); `failed` → `Błąd pobierania: <reason ?? "">` (error); `partial` → `Pobrano częściowo — reszta przy następnym uruchomieniu.` (warning); else `nil`.
 - `rows`: every snapshot invoice in order; `id = ksefNumber`; `date` = `DD.MM` from `issueDate` (`2026-11-26` → `26.11`, string split, no locale); `url` = `URL(string: viewUrl)` only if `KsefLink.isAllowed`. `rows` is `[]` on `.failure`.
-- `emptyText`: `Brak zapisanych faktur.` when the snapshot was read and has no invoices; else `nil`.
+- `emptyText`: `Brak zapisanych faktur.` when the snapshot was read, has no invoices and `status != .failed`; else `nil` (after a failure an empty list means "unknown").
 - `rowLimit(isLarge:)`: large → 8; medium → 3, or 2 when `banner != nil`.
 - `timelineDates`: `[now]` + `updatedAt + staleAfter` (only on `.success` and if later than `now`) + the next Warsaw midnight after `now`; ascending.
 - Swift 6 mode rejects shared mutable `static let` `DateFormatter`s; format with `Calendar.dateComponents` and `String(format: "%02d", …)` (or create formatters inside the function).
@@ -367,17 +367,18 @@ Rules (spec 7.4, 7.5), all times in Europe/Warsaw (`Calendar(identifier: .gregor
 - `testNormalSnapshot`: `title == "KSeF · zaktualizowano 14:00"`, `newToday == "2 nowe dziś"`, `banner == nil`, `rows.count == 3`, `rows[0] == Row(id: "K1", seller: "Acme Sp. z o.o.", amount: "1230,00 PLN", date: "26.11", url: URL(string: "https://qr.ksef.mf.gov.pl/invoice/1111111111/26-11-2026/hash1"))`, `emptyText == nil`.
 - `testPluralTable`: `newTodayLabel(1) == "1 nowa dziś"`; 2, 3, 4, 22, 104 → `"<n> nowe dziś"`; 5, 11, 12, 13, 14, 21, 112 → `"<n> nowych dziś"`.
 - `testNoCountWhenZeroOrNotToday`: `savedToday: 0` → `newToday == nil`; `today: "2026-11-25"` → `nil`; `now` = 2026-11-26T23:00:00Z (`1795734000`, Warsaw midnight) with `today: "2026-11-26"` → `nil`.
-- `testStaleAfterThreeHours`: `now = updatedAt + 3 h` → `banner == nil`; `+ 3 h + 1 s` → `Banner(text: "Dane nieaktualne — ostatnia aktualizacja 26.11 14:00", tone: .error)`.
+- `testStaleFromThreeHours`: `now = updatedAt + 3 h − 1 s` → `banner == nil`; `now = updatedAt + 3 h` → `Banner(text: "Dane nieaktualne — ostatnia aktualizacja 26.11 14:00", tone: .error)` (the timeline entry scheduled at exactly `updatedAt + 3 h` must already show it).
 - `testFailed`: `reason: "Brak połączenia z KSeF: fetch failed"` → `Banner(text: "Błąd pobierania: Brak połączenia z KSeF: fetch failed", tone: .error)`; `rows.count == 3`.
 - `testPartial` → `Banner(text: "Pobrano częściowo — reszta przy następnym uruchomieniu.", tone: .warning)`.
 - `testStaleBeatsFailed`: failed snapshot, `now = updatedAt + 4 h` → the stale banner.
 - `testMissing`: `.failure(.missing)` → `title == "KSeF"`, `newToday == nil`, `Banner(text: "Brak danych — pobieranie jeszcze nie zapisało stanu widżetu.", tone: .error)`, `rows == []`, `emptyText == nil`.
 - `testUnreadable`: `.failure(.unreadable("x"))` → `Banner(text: "Nie można odczytać danych widżetu: x", tone: .error)`.
 - `testEmptyList`: `invoiceCount: 0` → `rows == []`, `emptyText == "Brak zapisanych faktur."`.
+- `testFailedEmptyListHasNoEmptyText`: `status: .failed, reason: "Uszkodzony plik index.jsonl, linia 1", invoiceCount: 0` → `emptyText == nil`, failed banner shown.
 - `testHostileSellerStaysVerbatim`: `invoiceCount: 8` → `rows[3].seller == "**Evil** [x](https://e.example)\nline2"`.
 - `testDisallowedURLHasNoLink`: a snapshot whose first `viewUrl` is `https://evil.example/x` → `rows[0].url == nil`.
 - `testRowLimit`: large → 8; medium without banner → 3; medium with the partial banner → 2.
-- `testTimelineDates`: `.success` → `[now, 1795708841.123, 1795734000]` (16:00:41.123Z, then 23:00Z = Warsaw midnight); `.failure(.missing)` → `[now, 1795734000]`; `now = updatedAt + 4 h` → `[now, 1795734000]`.
+- `testTimelineDates` (let `midnight = Date(timeIntervalSince1970: 1795734000)`, 2026-11-26T23:00:00Z = Warsaw midnight; build the other expected dates from `Fixtures.updatedAt.addingTimeInterval(…)`, not from literal doubles): `.success` → `[now, Fixtures.updatedAt.addingTimeInterval(WidgetModel.staleAfter), midnight]`; `.failure(.missing)` → `[now, midnight]`; `now = Fixtures.updatedAt.addingTimeInterval(4 * 3600)` → `[now, midnight]`.
 
 Run: `xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefWidgetTests -destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build test` → FAIL (types missing).
 
@@ -477,7 +478,8 @@ Do not launch the app without a URL (its alert waits for a click) and do not pas
 - [ ] **Step 8: Unregister the build products**
 
 Run: `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "$PWD/widget/build/Build/Products/Release/KsefWidget.app"` (and the same for `Debug/KsefWidget.app` if it exists).
-Run: `pluginkit -m -p com.apple.widgetkit-extension | grep -c ksef-daily-fetch` → `0`.
+Run: `pluginkit -m -p com.apple.widgetkit-extension | grep -c ksef-daily-fetch` → `0` (confirmed on this Mac: `lsregister -u` removes the entry while the bundle stays on disk). If a later build or test run registers it again, repeat this step before finishing.
+Also check the deployment target held: the build above used macOS 14.0 (UNCONFIRMED in spec 8); if it failed only because an API needs a newer macOS, raise `deploymentTarget` to the lowest version that builds and say so in the commit message.
 
 - [ ] **Step 9: Commit** `git add widget/project.yml widget/Extension widget/Shared widget/App widget/Tests` then `git commit -m "feat(widget): desktop widget, content view and link-forwarding host app"`.
 
@@ -512,7 +514,7 @@ Run: `pluginkit -m -p com.apple.widgetkit-extension | grep -c ksef-daily-fetch` 
 
 Run: `pnpm test && pnpm typecheck` → PASS.
 Run: the widget test command → `** TEST SUCCEEDED **`.
-Run: `grep -rn "$(basename "$HOME")" README.md AGENTS.md docs widget src scripts test; echo "matches=$?"` → `matches=1` (no home-directory name in tracked text).
+Run: `git grep -n "$(basename "$HOME")"` → no output, exit status 1 (no home-directory name in tracked files; `git grep` skips the untracked `widget/build` and generated project, which embed absolute paths).
 Run: `git status --short` → only `README.md` and `AGENTS.md` modified; `git ls-files widget` lists no `.xcodeproj` or `build` paths.
 Run: `pluginkit -m -p com.apple.widgetkit-extension | grep -c ksef-daily-fetch` → `0`; `ls ~/Library/LaunchAgents | grep -c ksef` → `0`; `test -e "$HOME/Library/Application Support/ksef-daily-fetch"; echo "exists=$?"` → `exists=1` (unless it existed before Task 1).
 
