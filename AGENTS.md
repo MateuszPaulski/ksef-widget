@@ -35,7 +35,7 @@ A personal macOS tool: `KSeF.app`, a native menu-bar app that every hour fetches
 
 ## State
 
-The app folder `~/Library/Application Support/local.ksef-daily-fetch.KsefWidget/` (folder 0700): `settings.json`, `ksef-auth.crt`, `ksef-auth.key` (0600); the key password is one generic-password item in the login Keychain. Under the invoice folder (default `~/Documents/KSeF`, unchanged formats): `state.json` (checkpoint), `index.jsonl` (append-only, one line per saved invoice, also the dedup set), `invoices/YYYY/MM/<ksefNumber>.xml` (bytes exactly as KSeF returned them), `reports/YYYY-MM-DD.md` (a day can hold several sections). Outside both: `~/Library/Application Support/ksef-daily-fetch/widget.json` (widget snapshot, rewritten after every run).
+The app folder `~/Library/Application Support/local.ksef-daily-fetch.KsefWidget/` (folder 0700): `settings.json`, `ksef-auth.crt`, `ksef-auth.key` (0600); the key password is one generic-password item in the login Keychain. Under the invoice folder (default `~/Documents/KSeF`, unchanged formats): `identity.json` (the NIP and environment the folder belongs to; app only), `state.json` (checkpoint), `index.jsonl` (append-only, one line per saved invoice, also the dedup set), `invoices/YYYY/MM/<ksefNumber>.xml` (bytes exactly as KSeF returned them), `reports/YYYY-MM-DD.md` (a day can hold several sections). Outside both: `~/Library/Application Support/ksef-daily-fetch/widget.json` (widget snapshot, rewritten after every run).
 
 ## Known follow-ups
 

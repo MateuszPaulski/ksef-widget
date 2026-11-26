@@ -202,6 +202,7 @@ final class SettingsWindowController {
             }
             let outcome = connectionCheckResult(try await app.perform(settings, dryRun: true))
             if !outcome.isError {
+                try adoptDataFolder(settings)
                 settings.verified = true
                 try SettingsFile.save(settings, to: app.paths.settings)
             }

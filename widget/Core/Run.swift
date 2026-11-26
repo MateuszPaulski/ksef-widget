@@ -44,6 +44,8 @@ public func run(_ options: RunOptions) async -> RunSummary {
     var summary: RunSummary
 
     do {
+        let hasMarker = try checkDataFolder(dataDir, settings: settings)
+        if !hasMarker && !options.dryRun { try writeDataFolderMarker(dataDir, settings: settings) }
         let credentials = try loadCredentials(certificateURL: options.certificateURL, keyURL: options.keyURL, password: options.keyPassword)
         let store = try Store.open(dataDir: dataDir, now: now)
         let http = KsefHTTP(apiBase: settings.environment.apiBase, transport: options.transport, sleep: options.sleep)

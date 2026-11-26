@@ -67,7 +67,7 @@ Where things live (the widget can read only the snapshot, the last item):
 
 - `~/Library/Application Support/local.ksef-daily-fetch.KsefWidget/`, folder mode 0700: `settings.json`, `ksef-auth.crt` and `ksef-auth.key` (still encrypted), mode 0600.
 - Login Keychain: one item, service `local.ksef-daily-fetch.KsefWidget`, account `key-password`, label `KSeF — hasło klucza prywatnego`.
-- The invoice folder: `state.json` (checkpoint), `index.jsonl` (one line per saved invoice, also the dedup set), `invoices/YYYY/MM/<ksefNumber>.xml` and `reports/YYYY-MM-DD.md`. The formats are the same as the TypeScript fetcher's.
+- The invoice folder: `state.json` (checkpoint), `index.jsonl` (one line per saved invoice, also the dedup set), `invoices/YYYY/MM/<ksefNumber>.xml` and `reports/YYYY-MM-DD.md`. The formats are the same as the TypeScript fetcher's. The app adds `identity.json` (`{"nip", "environment"}`): a folder belongs to one NIP and environment, and a run or a check against another is refused with `Folder faktur zawiera dane innego podatnika lub środowiska`; a folder without the file (new, or written by the TypeScript fetcher) is adopted.
 - `~/Library/Application Support/ksef-daily-fetch/widget.json`: the widget snapshot, rewritten after every run.
 
 ## Running

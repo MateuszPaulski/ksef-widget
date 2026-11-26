@@ -411,6 +411,98 @@ final class RunTests: XCTestCase {
         XCTAssertTrue(r.logs.value.contains { $0.contains("Powiadomienia są wyłączone") })
     }
 
+    private func writeIdentity(_ dataDir: URL, nip: String, environment: String) throws {
+        try FileManager.default.createDirectory(at: dataDir, withIntermediateDirectories: true)
+        try Data("{\"nip\":\"\(nip)\",\"environment\":\"\(environment)\"}\n".utf8).write(to: dataDir.appendingPathComponent("identity.json"))
+    }
+
+    private func mismatchMessage(nip: String, environment: String) -> String {
+        "Folder faktur zawiera dane innego podatnika lub środowiska (NIP \(nip), \(environment)). Wybierz inny folder w Ustawieniach."
+    }
+
+    func testAFolderOfAnotherNipIsRefusedBeforeAnyRequest() async throws {
+        let r = rig(invoices: [fakeInvoice(1)])
+        try writeIdentity(r.dataDir, nip: "1111111111", environment: "test")
+
+        let summary = await KsefCore.run(r.options)
+
+        XCTAssertEqual(summary.status, .failed)
+        XCTAssertEqual(summary.reason, mismatchMessage(nip: "1111111111", environment: "test"))
+        let requests = await r.fake.requests.count
+        XCTAssertEqual(requests, 0)
+        XCTAssertEqual(r.notifications.value.count, 1)
+        XCTAssertTrue(try text(reportURL(r.dataDir)).contains("BŁĄD — Folder faktur zawiera dane innego podatnika"))
+        XCTAssertEqual(try snapshot(r.snapshotURL)["status"] as? String, "failed")
+        XCTAssertFalse(exists(r.dataDir.appendingPathComponent("index.jsonl")))
+        XCTAssertFalse(exists(r.dataDir.appendingPathComponent("state.json")))
+    }
+
+    func testAFolderOfAnotherEnvironmentIsRefused() async throws {
+        let r = rig(invoices: [fakeInvoice(1)])
+        try writeIdentity(r.dataDir, nip: "5265877635", environment: "prod")
+
+        let summary = await KsefCore.run(r.options)
+
+        XCTAssertEqual(summary.status, .failed)
+        XCTAssertEqual(summary.reason, mismatchMessage(nip: "5265877635", environment: "prod"))
+        XCTAssertEqual(summary.saved.count, 0)
+    }
+
+    func testAFolderWithoutAMarkerIsAdoptedAndKeepsItsCheckpoint() async throws {
+        let r = rig(invoices: [fakeInvoice(1)])
+        try FileManager.default.createDirectory(at: r.dataDir, withIntermediateDirectories: true)
+        let written = "{\"checkpoint\":\"2026-11-26T05:00:00.0000000+00:00\"}\n"
+        try Data(written.utf8).write(to: r.dataDir.appendingPathComponent("state.json"))
+
+        let summary = await KsefCore.run(r.options)
+
+        XCTAssertEqual(summary.status, .complete)
+        XCTAssertEqual(
+            try text(r.dataDir.appendingPathComponent("identity.json")), "{\"nip\":\"5265877635\",\"environment\":\"test\"}\n"
+        )
+        XCTAssertEqual(try state(r.dataDir), ["checkpoint": HWM] as NSDictionary)
+    }
+
+    func testAMatchingMarkerRunsNormally() async throws {
+        let r = rig(invoices: [fakeInvoice(1)])
+        try writeIdentity(r.dataDir, nip: "5265877635", environment: "test")
+
+        let summary = await KsefCore.run(r.options)
+
+        XCTAssertEqual(summary.status, .complete)
+        XCTAssertEqual(summary.saved.count, 1)
+    }
+
+    func testADryRunOnAnotherIdentityFailsAndWritesNothing() async throws {
+        let r = rig(invoices: [fakeInvoice(1)], dryRun: true)
+        try writeIdentity(r.dataDir, nip: "5265877635", environment: "prod")
+
+        let summary = await KsefCore.run(r.options)
+
+        XCTAssertEqual(summary.status, .failed)
+        XCTAssertEqual(summary.reason, mismatchMessage(nip: "5265877635", environment: "prod"))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: r.dataDir.path), ["identity.json"])
+        XCTAssertFalse(exists(r.snapshotURL))
+        XCTAssertEqual(r.notifications.value.count, 0)
+    }
+
+    func testAdoptingAFolderWritesTheMarkerAndRefusesAnotherIdentity() throws {
+        let dataDir = root.appendingPathComponent("adopted")
+        let settings = Settings(nip: "5265877635", environment: .test, startDate: "2026-11-01", dataDir: dataDir.path, verified: true)
+
+        try adoptDataFolder(settings)
+        try adoptDataFolder(settings)
+
+        XCTAssertEqual(
+            try text(dataDir.appendingPathComponent("identity.json")), "{\"nip\":\"5265877635\",\"environment\":\"test\"}\n"
+        )
+        var other = settings
+        other.environment = .prod
+        XCTAssertThrowsError(try adoptDataFolder(other)) {
+            XCTAssertEqual(errorMessage($0), mismatchMessage(nip: "5265877635", environment: "test"))
+        }
+    }
+
     private let setupMessage = "Brak hasła klucza w Pęku kluczy (usługa local.ksef-daily-fetch.KsefWidget, konto key-password)"
 
     func testSetupFailureNotifiesAndWritesAFailedSnapshot() async throws {
