@@ -8,6 +8,31 @@ export interface AccessToken {
   validUntil: string;
 }
 
+export interface Window {
+  from: string;
+  to?: string;
+}
+
+export interface InvoiceMetadata {
+  ksefNumber: string;
+  invoiceNumber: string;
+  issueDate: string; // YYYY-MM-DD
+  permanentStorageDate: string;
+  seller: { nip: string; name?: string | null };
+  grossAmount: number;
+  currency: string;
+  invoiceHash: string; // SHA-256, Base64
+}
+
+export interface MetadataPage {
+  hasMore: boolean;
+  isTruncated: boolean;
+  permanentStorageHwmDate?: string | null;
+  invoices: InvoiceMetadata[];
+}
+
+export const PAGE_SIZE = 250;
+
 const AUTH_POLL_INTERVAL_MS = 1000;
 const AUTH_MAX_POLLS = 120;
 const STATUS_IN_PROGRESS = 100;
@@ -52,4 +77,34 @@ export async function authenticate(
     }
   }
   throw new Error(`Uwierzytelnienie w KSeF nie zakończyło się w ${(AUTH_MAX_POLLS * AUTH_POLL_INTERVAL_MS) / 1000} s`);
+}
+
+export async function queryMetadata(
+  http: Http,
+  token: string,
+  window: Window,
+  pageOffset: number,
+): Promise<MetadataPage> {
+  const response = await http(
+    'POST',
+    `/invoices/query/metadata?sortOrder=Asc&pageOffset=${pageOffset}&pageSize=${PAGE_SIZE}`,
+    {
+      token,
+      json: {
+        subjectType: 'Subject2',
+        dateRange: {
+          dateType: 'PermanentStorage',
+          from: window.from,
+          ...(window.to === undefined ? {} : { to: window.to }),
+          restrictToPermanentStorageHwmDate: true,
+        },
+      },
+    },
+  );
+  return (await response.json()) as MetadataPage;
+}
+
+export async function downloadInvoice(http: Http, token: string, ksefNumber: string): Promise<Buffer> {
+  const response = await http('GET', `/invoices/ksef/${ksefNumber}`, { token, accept: 'application/xml' });
+  return Buffer.from(await response.arrayBuffer());
 }
