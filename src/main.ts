@@ -1,9 +1,12 @@
+import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { loadConfig } from './config.ts';
 import { readKeyPassword } from './credentials.ts';
 import { createOsascriptNotifier } from './notify.ts';
 import { run } from './run.ts';
+import { buildSnapshot, writeSnapshot } from './snapshot.ts';
 
+const SNAPSHOT_PATH = join(homedir(), 'Library', 'Application Support', 'ksef-daily-fetch', 'widget.json');
 const USAGE = 'Usage: node src/main.ts [--dry-run | --test-notification]';
 // 3 = main.ts handled a failure itself; 1 is left to usage errors and to Node dying before main runs,
 // which scripts/run-daily.sh reports.
@@ -42,6 +45,11 @@ async function main(args: string[]): Promise<number> {
       } catch (notifyErr) {
         console.error(`could not show the notification: ${errorMessage(notifyErr)}`);
       }
+      try {
+        await writeSnapshot(SNAPSHOT_PATH, buildSnapshot({ status: 'failed', reason: message }, [], new Date()));
+      } catch (snapshotErr) {
+        console.error(`could not write the widget snapshot: ${errorMessage(snapshotErr)}`);
+      }
     }
     return EXIT_CODES.failed;
   }
@@ -54,6 +62,7 @@ async function main(args: string[]): Promise<number> {
     now: () => new Date(),
     notify,
     log: (line) => console.log(`${new Date().toISOString()} ${line}`),
+    snapshotPath: SNAPSHOT_PATH,
     dryRun,
   });
   if (dryRun && summary.status === 'failed') console.error(summary.reason);

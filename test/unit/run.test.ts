@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -44,7 +44,9 @@ describe('run', () => {
     const sleeps: number[] = [];
     const notifications: Array<{ title: string; message: string }> = [];
     const logs: string[] = [];
-    const dataDir = join(root, `data-${counter++}`);
+    const n = counter++;
+    const dataDir = join(root, `data-${n}`);
+    const snapshotPath = join(root, `widget-${n}.json`);
     const config: Config = {
       nip,
       environment: 'test',
@@ -67,13 +69,15 @@ describe('run', () => {
         notifications.push({ title, message });
       },
       log: (line) => logs.push(line),
+      snapshotPath,
       ...overrides,
     };
-    return { options, fake, dataDir, sleeps, notifications, logs };
+    return { options, fake, dataDir, snapshotPath, sleeps, notifications, logs };
   }
 
   const ksefRequests = (requests: Array<{ path: string }>) => requests.filter((r) => r.path.startsWith('/invoices/ksef/'));
   const reportPath = (dataDir: string) => join(dataDir, 'reports', `${warsawDay(START)}.md`);
+  const readSnapshot = async (snapshotPath: string) => JSON.parse(await readFile(snapshotPath, 'utf8'));
   const indexLines = async (dataDir: string) => (await readFile(join(dataDir, 'index.jsonl'), 'utf8')).trim().split('\n');
 
   it('saves new invoices, reports and notifies once', async () => {
@@ -202,13 +206,17 @@ describe('run', () => {
   });
 
   it('a dry run writes and notifies nothing', async () => {
-    const { options, fake, dataDir, notifications, logs } = setup({ invoices: [fakeInvoice(1), fakeInvoice(2)] }, { dryRun: true });
+    const { options, fake, dataDir, snapshotPath, notifications, logs } = setup(
+      { invoices: [fakeInvoice(1), fakeInvoice(2)] },
+      { dryRun: true },
+    );
 
     const summary = await run(options);
 
     assert.equal(summary.status, 'complete');
     assert.deepEqual(summary.saved, []);
     assert.equal(await exists(dataDir), false);
+    assert.equal(await exists(snapshotPath), false);
     assert.equal(notifications.length, 0);
     assert.deepEqual(ksefRequests(fake.requests), []);
     assert.equal(logs.length, 1);
@@ -216,7 +224,7 @@ describe('run', () => {
   });
 
   it('a failed dry run stays quiet', async () => {
-    const { options, dataDir, notifications } = setup(
+    const { options, dataDir, snapshotPath, notifications } = setup(
       { invoices: [], authStatus: { code: 460, description: 'Błąd certyfikatu' } },
       { dryRun: true },
     );
@@ -226,7 +234,70 @@ describe('run', () => {
     assert.equal(summary.status, 'failed');
     assert.ok(summary.reason?.startsWith('Uwierzytelnienie w KSeF nieudane (kod 460'));
     assert.equal(await exists(dataDir), false);
+    assert.equal(await exists(snapshotPath), false);
     assert.equal(notifications.length, 0);
+  });
+
+  it('writes the widget snapshot after saving invoices', async () => {
+    const { options, snapshotPath } = setup({ invoices: [fakeInvoice(1), fakeInvoice(2)] });
+
+    await run(options);
+
+    const snapshot = await readSnapshot(snapshotPath);
+    assert.equal(snapshot.status, 'complete');
+    assert.equal('reason' in snapshot, false);
+    assert.equal(snapshot.today, warsawDay(START));
+    assert.equal(snapshot.savedToday, 2);
+    assert.deepEqual(
+      snapshot.invoices.map((i: { invoiceNumber: string }) => i.invoiceNumber),
+      ['FV/2', 'FV/1'],
+    );
+    assert.equal(snapshot.invoices[0].seller, 'Sprzedawca 2');
+    assert.equal(snapshot.invoices[0].amount, '200,50 PLN');
+    assert.ok(snapshot.invoices[0].viewUrl.startsWith('https://qr-test.ksef.mf.gov.pl/invoice/1111111111/20-11-2026/'));
+  });
+
+  it('a quiet run still writes the snapshot', async () => {
+    const { options, snapshotPath } = setup({ invoices: [fakeInvoice(1), fakeInvoice(2)] });
+    await run(options);
+    await rm(snapshotPath);
+
+    await run(options);
+
+    const snapshot = await readSnapshot(snapshotPath);
+    assert.equal(snapshot.status, 'complete');
+    assert.equal(snapshot.invoices.length, 2);
+  });
+
+  it('a failed run records the failure in the snapshot', async () => {
+    const { options, snapshotPath } = setup({
+      invoices: [],
+      authStatus: { code: 460, description: 'Błąd certyfikatu' },
+    });
+
+    await run(options);
+
+    const snapshot = await readSnapshot(snapshotPath);
+    assert.equal(snapshot.status, 'failed');
+    assert.ok(snapshot.reason.startsWith('Uwierzytelnienie w KSeF nieudane (kod 460'));
+    assert.deepEqual(snapshot.invoices, []);
+    assert.equal(snapshot.savedToday, 0);
+  });
+
+  it('a corrupt index still gives a failed snapshot', async () => {
+    const { options, dataDir, snapshotPath, logs } = setup({ invoices: [] });
+    await mkdir(dataDir, { recursive: true });
+    await writeFile(join(dataDir, 'index.jsonl'), '{"ksefNumber":');
+
+    const summary = await run(options);
+
+    assert.equal(summary.status, 'failed');
+    assert.equal(summary.reason, 'Uszkodzony plik index.jsonl, linia 1');
+    const snapshot = await readSnapshot(snapshotPath);
+    assert.equal(snapshot.status, 'failed');
+    assert.equal(snapshot.reason, 'Uszkodzony plik index.jsonl, linia 1');
+    assert.deepEqual(snapshot.invoices, []);
+    assert.ok(logs.some((line) => line.includes('could not read the index for the widget')));
   });
 
   it('survives a failing notifier', async () => {

@@ -100,6 +100,7 @@ describe('fetch against KSeF TEST', () => {
           notifications.push({ title, message });
         },
         log: (line) => logs.push(line),
+        snapshotPath: join(dir, 'widget.json'),
       });
 
     let summary: RunSummary | undefined;

@@ -5,7 +5,8 @@ import { createHttp } from './http.ts';
 import { authenticate, downloadInvoice, queryMetadata, type InvoiceMetadata } from './ksef.ts';
 import type { Notifier } from './notify.ts';
 import { formatNotification, formatReportSection, warsawDay, type RunSummary } from './report.ts';
-import { appendReport, openStore } from './store.ts';
+import { buildSnapshot, widgetInvoice, writeSnapshot, type WidgetInvoice } from './snapshot.ts';
+import { appendReport, openStore, readIndex } from './store.ts';
 import { listWindow, nextWindow, syncInvoices, type Query } from './sync.ts';
 
 export interface RunOptions {
@@ -16,6 +17,7 @@ export interface RunOptions {
   now: () => Date;
   notify: Notifier;
   log: (line: string) => void;
+  snapshotPath: string;
   dryRun?: boolean;
 }
 
@@ -78,6 +80,18 @@ export async function run(options: RunOptions): Promise<RunSummary> {
         log(`could not show the notification: ${errorMessage(err)}`);
       }
     }
+  }
+
+  let invoices: WidgetInvoice[] = [];
+  try {
+    invoices = (await readIndex(config.dataDir)).map((entry) => widgetInvoice(entry, config.environment));
+  } catch (err) {
+    log(`could not read the index for the widget: ${errorMessage(err)}`);
+  }
+  try {
+    await writeSnapshot(options.snapshotPath, buildSnapshot(summary, invoices, now()));
+  } catch (err) {
+    log(`could not write the widget snapshot: ${errorMessage(err)}`);
   }
   log(`status=${summary.status} saved=${summary.saved.length}${summary.reason === undefined ? '' : ` reason=${summary.reason}`}`);
   return summary;
