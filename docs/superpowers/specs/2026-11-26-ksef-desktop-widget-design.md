@@ -47,7 +47,7 @@ All checked on 2026-11-26 on the owner's Mac (macOS 27.0.1, Apple Silicon, Xcode
 
 **Data sharing**
 
-- App Group containers on macOS 15 and later are protected. Apple DTS ("App Groups: macOS vs iOS: Working Towards Harmony", developer.apple.com/forums/thread/721701): access to a group container requires claiming the group in the App Groups entitlement, "because of app group container protection", and is granted without a prompt only for Mac App Store, TestFlight, a Team-ID-prefixed group ID, or a group authorised by an embedded provisioning profile; otherwise "the system prompts the user to approve its access to the container. If granted, that consent applies only for the duration of that app instance." The fetcher is a Homebrew `node` binary that claims no entitlement, started hourly by launchd with no UI.
+- App Group containers on macOS 15 and later are protected. Apple DTS ("App Groups: macOS vs iOS: Working Towards Harmony", developer.apple.com/forums/thread/721701): access to a group container requires claiming the group in the App Groups entitlement, "because of app group container protection", and is granted without a prompt only for Mac App Store, TestFlight, a Team-ID-prefixed group ID, or a group authorised by an embedded provisioning profile; otherwise "the system prompts the user to approve its access to the container. If granted, that consent applies only for the duration of that app instance." The fetcher is a plain `node` binary (installed through nvm on this Mac) that claims no entitlement, started hourly by launchd with no UI. Applying these rules to it is an inference from the DTS posts; it was not probed.
 - Writing into another app's sandbox container (`~/Library/Containers/<id>`) from a non-sandboxed process triggers the "would like to access data from other apps" consent, which DTS describes as "Transient, process lifetime" (developer.apple.com/forums/thread/742147), so every hourly Node process would be asked again.
 - `com.apple.security.temporary-exception.files.home-relative-path.read-only` "Enables read-only access to the specified files or subdirectories in the user's home directory"; each value starts with `/`, is relative to `~`, and a directory ends with `/` (Apple, App Sandbox Temporary Exception Entitlements).
 - **Probe, confirmed:** a command-line tool ad-hoc signed with `com.apple.security.app-sandbox` plus that read-only exception for a home-relative directory read a JSON file in that directory; the same binary signed with the sandbox entitlement alone got `NSCocoaErrorDomain 257` / `EPERM` for the same file. The exception directory contained a space and worked. Inside the sandbox `NSHomeDirectory()` and `FileManager.homeDirectoryForCurrentUser` both return the container (`~/Library/Containers/<bundle id>/Data`), so the real home must come from `getpwuid(getuid())`. A missing file gives `260` / `ENOENT` with or without the exception, so only an existing file proves access. A sandboxed command-line tool needs an embedded Info.plist with `CFBundleIdentifier` or it dies with `SIGTRAP` (`Unable to get bundle identifier for container id`); Xcode's `CREATE_INFOPLIST_SECTION_IN_BINARY = YES` provides it. Rebuilding and re-signing ad hoc under the same identifier reused the existing container without a prompt.
@@ -58,7 +58,7 @@ All checked on 2026-11-26 on the owner's Mac (macOS 27.0.1, Apple Silicon, Xcode
 - **Confirmed:** `CODE_SIGN_IDENTITY = "-"` (ad-hoc, "Sign to Run Locally") builds, embeds and signs the app and the extension; `codesign --verify --deep --strict` passes. The App Sandbox and temporary-exception entitlements need no provisioning profile.
 - **Confirmed:** another widget app on the owner's Mac, ad-hoc signed and installed in `~/Applications`, is live: `chronod` reloads its timeline every 15–16 minutes all day ("Reload success" at 10:37, 10:53, 11:09, … 16:27). So an ad-hoc-signed widget extension is accepted on this macOS.
 - **Observed:** for an ad-hoc app left in a build directory, `chronod` logs "Requested to add extension, but purging instead because we shouldn't cache it", with and without the temporary exception. The likely cause is the location (the live widget is in `~/Applications`); UNCONFIRMED. The owner installs into `~/Applications`.
-- Building registers the built app with LaunchServices, and its extension then appears in `pluginkit -m -p com.apple.widgetkit-extension`. `lsregister -u <app>` removes it. Two registered copies of one bundle ID (build directory and `~/Applications`) should be avoided.
+- Building registers the built app with LaunchServices, and its extension then appears in `pluginkit -m -p com.apple.widgetkit-extension`. **Confirmed:** `lsregister -u <app>` removes it from that list while the bundle stays on disk. Two registered copies of one bundle ID (build directory and `~/Applications`) should be avoided.
 
 **Links** (Apple, "Linking to specific app scenes from your widget or Live Activity")
 
@@ -98,7 +98,7 @@ All checked on 2026-11-26 on the owner's Mac (macOS 27.0.1, Apple Silicon, Xcode
 
 ### 6.2 Fetcher → widget data sharing
 
-- **(a) App Group container (rejected).** Since macOS 15 the container is guarded: a process that does not claim the group in its entitlements is prompted, and the consent lasts one process lifetime (5). The writer is an unsigned-by-us Homebrew `node` run hourly by launchd with no UI, so every run would hit a prompt or a denial. Wrapping Node in a signed helper that claims the group adds a third binary and a Team ID in the build.
+- **(a) App Group container (rejected).** Since macOS 15 the container is guarded: a process that does not claim the group in its entitlements is prompted, and the consent lasts one process lifetime (5). The writer is a third-party `node` binary run hourly by launchd with no UI, so by the DTS rules (not probed) every run would hit a prompt or a denial. Wrapping Node in a signed helper that claims the group adds a third binary and a Team ID in the build.
 - **(b) Read-only temporary exception for a fixed home-relative directory (chosen).** The fetcher writes `~/Library/Application Support/ksef-daily-fetch/widget.json` as an ordinary file in the owner's home; the widget extension's entitlements grant read-only access to `/Library/Application Support/ksef-daily-fetch/`. No container protection, no consent, no Team ID, no provisioning profile; proven by probe on this Mac (5). Temporary exceptions are discouraged for the Mac App Store, which is a non-goal.
 - **(c) Fetcher writes into the widget's own sandbox container (rejected).** Same per-process consent problem as (a) for `~/Library/Containers` (5).
 - **(d) Host app as a relay (rejected).** The host app would have to run to copy data; it does not run between clicks.
@@ -167,11 +167,11 @@ All checked on 2026-11-26 on the owner's Mac (macOS 27.0.1, Apple Silicon, Xcode
 - (S) Banner, at most one, first match wins:
   1. missing file → `Brak danych — pobieranie jeszcze nie zapisało stanu widżetu.` (error)
   2. unreadable → `Nie można odczytać danych widżetu: <error description>` (error)
-  3. stale (`now − updatedAt > 3 h`) → `Dane nieaktualne — ostatnia aktualizacja DD.MM HH:mm` (error)
+  3. stale (`now − updatedAt ≥ 3 h`) → `Dane nieaktualne — ostatnia aktualizacja DD.MM HH:mm` (error)
   4. failed → `Błąd pobierania: <reason>` (error)
   5. partial → `Pobrano częściowo — reszta przy następnym uruchomieniu.` (warning)
   Stale outranks failed: an old failure means the job itself stopped. Three hours = two missed hourly runs plus margin. Error tone red, warning orange; the text alone carries the meaning because desktop widgets may render without colour.
-- (S) Rows: seller (one line, truncated), amount, issue date `DD.MM`. Medium shows 3 rows, 2 when a banner is shown; large shows up to 8. A readable snapshot with no invoices shows `Brak zapisanych faktur.` Seller and reason are rendered with `Text(verbatim:)` (seller text is attacker-controlled; no Markdown or localisation lookup).
+- (S) Rows: seller (one line, truncated), amount, issue date `DD.MM`. Medium shows 3 rows, 2 when a banner is shown; large shows up to 8. A readable snapshot with no invoices and a status other than `failed` shows `Brak zapisanych faktur.` (after a failure the empty list means "unknown", not "none", so only the banner shows). Seller and reason are rendered with `Text(verbatim:)` (seller text is attacker-controlled; no Markdown or localisation lookup).
 - (S) Each row is a `Link` to its `viewUrl`, only if that URL is `https` on `qr.ksef.mf.gov.pl`, `qr-test.ksef.mf.gov.pl` or `qr-demo.ksef.mf.gov.pl`; otherwise the row is plain text.
 
 ### 7.5 Timeline
@@ -192,9 +192,10 @@ All checked on 2026-11-26 on the owner's Mac (macOS 27.0.1, Apple Silicon, Xcode
 - **UNCONFIRMED** that an ad-hoc widget from `~/Applications` appears in the gallery for this app; evidence is another ad-hoc widget live from `~/Applications` on the same Mac. Fallback: Developer ID on the command line (6.4).
 - **UNCONFIRMED** that a widget click reaches `application(_:open:)` the way `open -a` does. Check: the owner clicks a row and `log show --predicate 'subsystem == "local.ksef-daily-fetch.widget"' --last 5m` shows the URL line.
 - **UNCONFIRMED** macOS widget point sizes; renders are a layout check. The owner judges the real look.
+- **UNCONFIRMED** deployment target 14.0: the prototype was built with 15.0. If an API used needs more, raise the target to the lowest that builds and say so.
 - **Question for the owner:** hourly repeats of the same failure notification (7.3). Today: kept.
 - Pre-existing: the README's example notification shows `1 230,00 PLN`, but Node prints `1230,00 PLN`. The README edit in this feature corrects that one example.
-- Probe leftovers outside the scratch directory: sandbox containers `~/Library/Containers/local.probe.ksef*` (five) and two crash reports `~/Library/Logs/DiagnosticReports/reader-*.ips`. They are inert; the owner may delete them.
+- Probe leftovers outside the scratch directory: sandbox containers `~/Library/Containers/local.probe.ksef*` (nine) and two crash reports `~/Library/Logs/DiagnosticReports/reader-*.ips`. They are inert; the owner may delete them.
 
 ## 9. Left to the builder
 
