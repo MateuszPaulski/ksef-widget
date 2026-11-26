@@ -10,12 +10,11 @@ public struct SnapshotStatus: Equatable, Sendable {
 
 /// Nil for a missing, unreadable or unrecognised file.
 public func readSnapshotStatus(_ url: URL) -> SnapshotStatus? {
-    guard let data = try? Data(contentsOf: url),
-          let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+    guard let object = readSnapshotObject(url),
           let updatedAt = object["updatedAt"] as? String, let millis = KsefTime.millis(updatedAt),
           let status = (object["status"] as? String).flatMap(RunStatus.init(rawValue:))
     else { return nil }
-    return SnapshotStatus(updatedAt: Date(timeIntervalSince1970: Double(millis) / 1000), status: status, reason: object["reason"] as? String)
+    return SnapshotStatus(updatedAt: KsefTime.date(millis: millis), status: status, reason: object["reason"] as? String)
 }
 
 public enum MenuState: Equatable, Sendable {

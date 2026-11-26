@@ -63,7 +63,7 @@ public func saveSettings(
 
 /// UTC midnight of `text`: the same Warsaw calendar day in winter and summer time.
 public func startDate(fromText text: String) -> Date? {
-    KsefTime.millis("\(text)T00:00:00Z").map { Date(timeIntervalSince1970: Double($0) / 1000) }
+    KsefTime.millis("\(text)T00:00:00Z").map(KsefTime.date(millis:))
 }
 
 public func startDateText(_ date: Date) -> String { warsawDay(date) }

@@ -3,7 +3,7 @@ import Foundation
 /// Validates the pair, stages both files next to their targets, then saves the password and renames them into place.
 /// A failure deletes the staged files and leaves the old files and password untouched until the Keychain write.
 /// `beforeStaging` runs after validation (nothing is left behind for a bad pair); `beforeKeychain` after both files are staged.
-public func installCredentials(
+func installCredentials(
     certificate: URL, key: URL, password: String, paths: AppPaths, secrets: SecretStore,
     beforeStaging: () throws -> Void = {}, beforeKeychain: () throws -> Void = {}
 ) throws {

@@ -48,6 +48,8 @@ enum KsefTime {
 
     static func millis(_ date: Date) -> Int64 { Int64((date.timeIntervalSince1970 * 1000).rounded(.down)) }
 
+    static func date(millis: Int64) -> Date { Date(timeIntervalSince1970: Double(millis) / 1000) }
+
     private struct Cursor {
         let bytes: [UInt8]
         var position = 0

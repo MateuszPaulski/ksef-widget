@@ -7,19 +7,19 @@ public enum RunStatus: String, Codable, Sendable {
     case complete, partial, failed
 }
 
-public struct DryRunCounts: Equatable, Sendable {
-    public let listed: Int
-    public let notSaved: Int
+struct DryRunCounts: Equatable, Sendable {
+    let listed: Int
+    let notSaved: Int
 }
 
 public struct RunSummary: Sendable {
-    public let startedAt: Date
+    let startedAt: Date
     public let status: RunStatus
-    public let reason: String?
+    let reason: String?
     /// Stable identity of a failure for "same failure again" checks; `reason` is display text and may be volatile.
-    public let failureKey: String?
+    let failureKey: String?
     public let saved: [InvoiceMetadata]
-    public let checked: DryRunCounts?
+    let checked: DryRunCounts?
 }
 
 func formatAmount(_ amount: Double, _ currency: String) -> String {
@@ -49,7 +49,7 @@ func invoiceViewUrl(_ environment: KsefEnvironment, sellerNip: String, issueDate
     return "\(environment.qrBase)/invoice/\(encodePathSegment(sellerNip))/\(reverseDate(issueDate, separator: "-"))/\(hash)"
 }
 
-public func invoiceCountLabel(_ n: Int) -> String {
+func invoiceCountLabel(_ n: Int) -> String {
     if n == 1 { return "1 nowa faktura" }
     let lastTwo = n % 100
     let isFew = n % 10 >= 2 && n % 10 <= 4 && (lastTwo < 12 || lastTwo > 14)
@@ -99,10 +99,14 @@ private func asciiLowercased(_ scalar: Unicode.Scalar) -> Unicode.Scalar {
     ("A"..."Z").contains(scalar) ? Unicode.Scalar(scalar.value + 32)! : scalar
 }
 
-private func warsawComponents(_ date: Date) -> DateComponents {
+private let warsawCalendar: Calendar = {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(identifier: "Europe/Warsaw")!
-    return calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+    return calendar
+}()
+
+private func warsawComponents(_ date: Date) -> DateComponents {
+    warsawCalendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
 }
 
 func warsawDay(_ date: Date) -> String {

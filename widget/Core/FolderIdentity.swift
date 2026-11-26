@@ -12,12 +12,7 @@ private func identityURL(_ dataDir: URL) -> URL { dataDir.appendingPathComponent
 /// The checkpoint and the index carry no identity, so a folder reused for another NIP or environment would resume
 /// from the wrong checkpoint without a word. Returns whether a marker exists; a folder without one passes.
 func checkDataFolder(_ dataDir: URL, settings: Settings) throws -> Bool {
-    let data: Data
-    do {
-        data = try Data(contentsOf: identityURL(dataDir))
-    } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-        return false
-    }
+    guard let data = try readIfExists(identityURL(dataDir)) else { return false }
     guard let identity = try? JSONDecoder().decode(FolderIdentity.self, from: data) else {
         throw KsefError("Uszkodzony plik \(identityFileName)")
     }

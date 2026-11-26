@@ -77,12 +77,6 @@ struct KsefHTTP: Sendable {
     let transport: any HTTPTransport
     let sleep: @Sendable (Int) async -> Void  // milliseconds
 
-    init(apiBase: String, transport: any HTTPTransport, sleep: @escaping @Sendable (Int) async -> Void) {
-        self.apiBase = apiBase
-        self.transport = transport
-        self.sleep = sleep
-    }
-
     func send(
         _ method: String, _ path: String, token: String? = nil, json: JSONValue? = nil, xml: String? = nil,
         accept: String = "application/json"

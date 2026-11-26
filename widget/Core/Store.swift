@@ -61,7 +61,7 @@ private struct State: Decodable {
 
 private let newline = UInt8(ascii: "\n")
 
-private func readIfExists(_ url: URL) throws -> Data? {
+func readIfExists(_ url: URL) throws -> Data? {
     do {
         return try Data(contentsOf: url)
     } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
@@ -88,9 +88,10 @@ private func append(_ data: Data, to url: URL) throws {
 func readIndex(dataDir: URL) throws -> [IndexEntry] {
     guard let data = try readIfExists(dataDir.appendingPathComponent("index.jsonl")) else { return [] }
     var entries: [IndexEntry] = []
+    let decoder = JSONDecoder()
     // Split on the newline byte only: Character-based line splitting also breaks at an unescaped U+2028 inside a JSON string.
     for (offset, line) in data.split(separator: newline, omittingEmptySubsequences: false).enumerated() where !line.isEmpty {
-        guard let entry = try? JSONDecoder().decode(IndexEntry.self, from: Data(line)) else {
+        guard let entry = try? decoder.decode(IndexEntry.self, from: Data(line)) else {
             throw KsefError("Uszkodzony plik index.jsonl, linia \(offset + 1)")
         }
         entries.append(entry)

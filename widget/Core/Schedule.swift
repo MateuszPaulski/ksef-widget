@@ -1,7 +1,7 @@
 import Foundation
 
 public enum RunSchedule {
-    public static let interval: TimeInterval = 3600
+    static let interval: TimeInterval = 3600
 
     /// A last run in the future means the clock moved back, so it is due too.
     public static func isDue(lastRunAt: Date?, now: Date) -> Bool {

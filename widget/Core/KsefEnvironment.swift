@@ -1,6 +1,6 @@
 import Foundation
 
-public enum KsefEnvironment: String, Codable, CaseIterable, Sendable {
+public enum KsefEnvironment: String, Codable, Sendable {
     case test, demo, prod
 
     var apiBase: String {

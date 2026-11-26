@@ -1,15 +1,15 @@
 import Foundation
 
 public struct AppPaths: Sendable {
-    public let appFolder: URL
+    let appFolder: URL
     public let settings: URL
     public let certificate: URL
     public let key: URL
     public let snapshot: URL
     public let defaultDataDir: URL
-    public let legacyLaunchAgent: URL
+    let legacyLaunchAgent: URL
 
-    public init(home: URL) {
+    init(home: URL) {
         let support = home.appendingPathComponent("Library/Application Support", isDirectory: true)
         appFolder = support.appendingPathComponent("local.ksef-daily-fetch.KsefWidget", isDirectory: true)
         settings = appFolder.appendingPathComponent("settings.json")

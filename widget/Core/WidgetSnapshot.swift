@@ -38,7 +38,7 @@ func widgetInvoice(_ entry: IndexEntry, _ environment: KsefEnvironment) -> Widge
 func buildSnapshot(status: RunStatus, reason: String?, failureKey: String?, invoices: [WidgetInvoice], now: Date) -> WidgetSnapshot {
     let today = warsawDay(now)
     let savedToday = invoices.filter { invoice in
-        KsefTime.millis(invoice.savedAt).map { warsawDay(Date(timeIntervalSince1970: Double($0) / 1000)) == today } ?? false
+        KsefTime.millis(invoice.savedAt).map { warsawDay(KsefTime.date(millis: $0)) == today } ?? false
     }.count
     return WidgetSnapshot(
         updatedAt: KsefTime.iso(now), status: status, reason: reason, failureKey: failureKey, today: today,
@@ -72,10 +72,14 @@ func writeSnapshot(_ snapshot: WidgetSnapshot, to url: URL) throws {
     try writeAtomic(Data((snapshot.json.pretty() + "\n").utf8), to: url)
 }
 
+func readSnapshotObject(_ url: URL) -> [String: Any]? {
+    guard let data = try? Data(contentsOf: url) else { return nil }
+    return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+}
+
 /// A missing, unreadable or malformed file, or one without a `failureKey`, counts as "no previous failure".
 func readPreviousFailure(_ url: URL) -> (failureKey: String, today: String)? {
-    guard let data = try? Data(contentsOf: url),
-          let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+    guard let object = readSnapshotObject(url),
           object["status"] as? String == "failed",
           let failureKey = object["failureKey"] as? String,
           let today = object["today"] as? String

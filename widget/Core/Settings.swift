@@ -24,7 +24,7 @@ private func asciiDigits(_ text: String) -> [Int]? {
     return bytes.allSatisfy { (48...57).contains($0) } ? bytes.map { Int($0) - 48 } : nil
 }
 
-public func isValidNip(_ nip: String) -> Bool {
+func isValidNip(_ nip: String) -> Bool {
     // The OpenAPI pattern: first digit 1-9, digits 2-3 not both 0.
     guard let digits = asciiDigits(nip), digits.count == 10, digits[0] != 0, !(digits[1] == 0 && digits[2] == 0) else { return false }
     let sum = zip(nipWeights, digits).reduce(0) { $0 + $1.0 * $1.1 }
@@ -42,7 +42,7 @@ private func isValidStartDate(_ value: String, today: Date) -> Bool {
 }
 
 extension Settings {
-    public func validate(today: Date) throws {
+    func validate(today: Date) throws {
         guard isValidNip(nip) else { throw KsefError("NIP musi mieć 10 cyfr i poprawną sumę kontrolną") }
         guard isValidStartDate(startDate, today: today) else {
             throw KsefError("Data początkowa musi mieć format RRRR-MM-DD i nie może być z przyszłości")
@@ -54,12 +54,7 @@ extension Settings {
 public enum SettingsFile {
     /// Nil when the file does not exist; a file that exists but is unusable throws.
     public static func load(_ url: URL) throws -> Settings? {
-        let data: Data
-        do {
-            data = try Data(contentsOf: url)
-        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-            return nil
-        }
+        guard let data = try readIfExists(url) else { return nil }
         let settings: Settings
         do {
             settings = try JSONDecoder().decode(Settings.self, from: data)

@@ -77,12 +77,11 @@ public func run(_ options: RunOptions) async -> RunSummary {
             sleep: options.sleep,
             onSaved: { saved.append($0) }
         ))
-        switch outcome {
-        case .complete:
-            summary = RunSummary(startedAt: startedAt, status: .complete, reason: nil, failureKey: nil, saved: saved, checked: nil)
-        case .partial(let reason):
-            summary = RunSummary(startedAt: startedAt, status: .partial, reason: reason, failureKey: nil, saved: saved, checked: nil)
+        let (status, reason): (RunStatus, String?) = switch outcome {
+        case .complete: (.complete, nil)
+        case .partial(let reason): (.partial, reason)
         }
+        summary = RunSummary(startedAt: startedAt, status: status, reason: reason, failureKey: nil, saved: saved, checked: nil)
     } catch {
         // An API error message embeds volatile response text; the status alone identifies the failure.
         let failureKey = (error as? KsefApiError).map { "KSeF \($0.status)" } ?? errorMessage(error)
@@ -94,10 +93,8 @@ public func run(_ options: RunOptions) async -> RunSummary {
     // A lasting failure would otherwise notify at every hourly run: stay quiet when the snapshot on disk already
     // holds the same failure from today. New invoices saved by this run are always announced.
     let finishedAt = now()
-    var repeatedFailure = false
-    if summary.status == .failed && summary.saved.isEmpty, let previous = readPreviousFailure(options.snapshotURL) {
-        repeatedFailure = previous.failureKey == summary.failureKey && previous.today == warsawDay(finishedAt)
-    }
+    let repeatedFailure = summary.status == .failed && summary.saved.isEmpty
+        && isRepeatedFailure(summary.failureKey, snapshotURL: options.snapshotURL, now: finishedAt)
 
     if summary.status != .complete || !summary.saved.isEmpty {
         do {
@@ -107,11 +104,7 @@ public func run(_ options: RunOptions) async -> RunSummary {
         }
         if repeatedFailure { log("repeated failure, notification skipped") }
         if !repeatedFailure, let notification = formatNotification(summary) {
-            do {
-                try await options.notify(notification.title, notification.message)
-            } catch {
-                log("could not show the notification: \(errorMessage(error))")
-            }
+            await notifyLogging(notification.title, notification.message, notify: options.notify, log: log)
         }
     }
 
@@ -121,14 +114,10 @@ public func run(_ options: RunOptions) async -> RunSummary {
     } catch {
         log("could not read the index for the widget: \(errorMessage(error))")
     }
-    do {
-        let snapshot = buildSnapshot(
-            status: summary.status, reason: summary.reason, failureKey: summary.failureKey, invoices: invoices, now: finishedAt
-        )
-        try writeSnapshot(snapshot, to: options.snapshotURL)
-    } catch {
-        log("could not write the widget snapshot: \(errorMessage(error))")
-    }
+    writeSnapshotLogging(
+        buildSnapshot(status: summary.status, reason: summary.reason, failureKey: summary.failureKey, invoices: invoices, now: finishedAt),
+        to: options.snapshotURL, log: log
+    )
     log("status=\(summary.status.rawValue) saved=\(summary.saved.count)\(summary.reason.map { " reason=\($0)" } ?? "")")
     return summary
 }
@@ -140,19 +129,34 @@ public func reportSetupFailure(
     notify: @Sendable (String, String) async throws -> Void, log: @Sendable (String) -> Void
 ) async {
     log("setup failed: \(message)")
-    if let previous = readPreviousFailure(snapshotURL), previous.failureKey == message, previous.today == warsawDay(now) {
+    if isRepeatedFailure(message, snapshotURL: snapshotURL, now: now) {
         log("repeated failure, notification skipped")
     } else {
-        do {
-            try await notify("KSeF: błąd pobierania faktur", message)
-        } catch {
-            log("could not show the notification: \(errorMessage(error))")
-        }
+        await notifyLogging("KSeF: błąd pobierania faktur", message, notify: notify, log: log)
     }
+    writeSnapshotLogging(
+        buildSnapshot(status: .failed, reason: message, failureKey: message, invoices: [], now: now), to: snapshotURL, log: log
+    )
+}
+
+private func isRepeatedFailure(_ failureKey: String?, snapshotURL: URL, now: Date) -> Bool {
+    guard let previous = readPreviousFailure(snapshotURL) else { return false }
+    return previous.failureKey == failureKey && previous.today == warsawDay(now)
+}
+
+private func notifyLogging(
+    _ title: String, _ message: String, notify: @Sendable (String, String) async throws -> Void, log: @Sendable (String) -> Void
+) async {
     do {
-        try writeSnapshot(
-            buildSnapshot(status: .failed, reason: message, failureKey: message, invoices: [], now: now), to: snapshotURL
-        )
+        try await notify(title, message)
+    } catch {
+        log("could not show the notification: \(errorMessage(error))")
+    }
+}
+
+private func writeSnapshotLogging(_ snapshot: WidgetSnapshot, to url: URL, log: @Sendable (String) -> Void) {
+    do {
+        try writeSnapshot(snapshot, to: url)
     } catch {
         log("could not write the widget snapshot: \(errorMessage(error))")
     }
