@@ -165,6 +165,17 @@ private func decrypt(_ key: EncryptedKey, password: String) throws -> [UInt8] {
     return Array(output[..<produced])
 }
 
+// OpenSSL and LibreSSL drop leading zero bytes of the scalar (about one key in 256), which CryptoKit's
+// DER import rejects, so the scalar is padded to 32 bytes and imported raw.
+private func p256Key(fromECPrivateKey der: [UInt8]) -> P256.Signing.PrivateKey? {
+    var reader = DERReader(der)
+    guard let sequence = try? reader.next(), sequence.tag == 0x30,
+          let fields = try? sequence.children(), fields.count >= 2, fields[1].tag == 0x04, fields[1].body.count <= 32
+    else { return nil }
+    let scalar = Data(repeating: 0, count: 32 - fields[1].body.count) + fields[1].body
+    return try? P256.Signing.PrivateKey(rawRepresentation: scalar)
+}
+
 private func signingKey(fromPrivateKeyInfo plain: [UInt8]) throws -> SigningKey {
     let algorithmIdentifier: (oid: String, parameters: DERElement?)
     let privateKey: [UInt8]
@@ -192,7 +203,7 @@ private func signingKey(fromPrivateKeyInfo plain: [UInt8]) throws -> SigningKey 
         guard let curve = algorithmIdentifier.parameters, curve.tag == 0x06, oidString(curve.body) == OID.prime256v1 else {
             throw unsupportedType("ec")
         }
-        guard let key = try? P256.Signing.PrivateKey(derRepresentation: plain) else { throw unreadable(decryptionFailed) }
+        guard let key = p256Key(fromECPrivateKey: privateKey) else { throw unreadable(decryptionFailed) }
         return .ec(key)
     default:
         throw unsupportedType(algorithmIdentifier.oid)
