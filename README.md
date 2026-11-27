@@ -109,8 +109,8 @@ A medium or large widget on the desktop lists the newest saved invoices (seller,
 
 The year summary line is one of four, in the widget's secondary colour (orange when it is a warning):
 
-- `2026 · wydatki 1230,00 PLN · przychody 0,00 PLN`: both sides are up to date as of the last run. Amounts of 10 000 and more are grouped with a non-breaking space.
-- `2026 (stan na 26.11 11:00) · wydatki … · przychody …`: orange; the last run did not complete the refresh (a limit, a failure, or a partial download), so the totals are as of the time shown, in Warsaw time, and the next complete run clears it.
+- `2026 netto · wydatki 1230,00 PLN · przychody 0,00 PLN`: both sides are up to date as of the last run. Amounts of 10 000 and more are grouped with a non-breaking space.
+- `2026 netto (stan na 26.11 11:00) · wydatki … · przychody …`: orange; the last run did not complete the refresh (a limit, a failure, or a partial download), so the totals are as of the time shown, in Warsaw time, and the next complete run clears it.
 - `2026 · podsumowanie w przygotowaniu`: orange; the ledger has not yet completed once, for example right after the update, so no total is shown.
 - `2026 · podsumowanie niedostępne: …`: orange; a ledger file cannot be read, with the reason (see Troubleshooting).
 

@@ -150,7 +150,7 @@ final class FetchE2ETests: XCTestCase {
         XCTAssertEqual(buyerLedger.count, 1)
         try assertLedgerLine(buyerLedger.first, subject: "Subject2", ksefNumber: ksefNumber)
         let buyerSummary = try snapshotYearSummary(dir.appendingPathComponent("widget.json"))
-        XCTAssertEqual(buyerSummary.text, "\(year) · wydatki 43,60 PLN · przychody 0,00 PLN")
+        XCTAssertEqual(buyerSummary.text, "\(year) netto · wydatki 43,60 PLN · przychody 0,00 PLN")
         XCTAssertEqual(buyerSummary.warning, false)
 
         let notificationsBefore = notifications.value.count
@@ -179,7 +179,7 @@ final class FetchE2ETests: XCTestCase {
         XCTAssertEqual(sellerLedger.count, 1)
         try assertLedgerLine(sellerLedger.first, subject: "Subject1", ksefNumber: ksefNumber)
         let sellerSummary = try snapshotYearSummary(sellerSnapshot)
-        XCTAssertEqual(sellerSummary.text, "\(year) · wydatki 0,00 PLN · przychody 43,60 PLN")
+        XCTAssertEqual(sellerSummary.text, "\(year) netto · wydatki 0,00 PLN · przychody 43,60 PLN")
         XCTAssertEqual(sellerSummary.warning, false)
     }
 

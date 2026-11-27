@@ -13,7 +13,7 @@ final class SnapshotTests: XCTestCase {
     }
 
     func testDecodesTheYearSummary() throws {
-        let summary = "2026 · wydatki 43,60 PLN · przychody 0,00 PLN"
+        let summary = "2026 netto · wydatki 43,60 PLN · przychody 0,00 PLN"
         let json = Fixtures.contractJSON.replacingOccurrences(
             of: "\n    }\n  ]\n}",
             with: "\n    }\n  ],\n  \"yearSummary\": {\"text\": \"\(summary)\", \"warning\": false}\n}")

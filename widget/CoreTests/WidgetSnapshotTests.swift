@@ -149,7 +149,7 @@ final class WidgetSnapshotTests: XCTestCase {
         try writeSnapshot(
             buildSnapshot(
                 status: .complete, reason: nil, failureKey: nil, invoices: [], now: now,
-                yearSummary: YearSummaryLine(text: "2026 · wydatki 43,60 PLN · przychody 0,00 PLN", warning: false)
+                yearSummary: YearSummaryLine(text: "2026 netto · wydatki 43,60 PLN · przychody 0,00 PLN", warning: false)
             ),
             to: url
         )
@@ -159,7 +159,7 @@ final class WidgetSnapshotTests: XCTestCase {
             """
               "invoices": [],
               "yearSummary": {
-                "text": "2026 · wydatki 43,60 PLN · przychody 0,00 PLN",
+                "text": "2026 netto · wydatki 43,60 PLN · przychody 0,00 PLN",
                 "warning": false
               }
             }

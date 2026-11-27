@@ -52,13 +52,13 @@ final class RenderTests: XCTestCase {
 
     func testRenderMediumSummaryStale() throws {
         let summary = Snapshot.YearSummary(
-            text: "2026 (stan na 26.11 11:00) · wydatki 48\u{a0}210,55 PLN · przychody 182\u{a0}400,00 PLN", warning: true)
+            text: "2026 netto (stan na 26.11 11:00) · wydatki 48\u{a0}210,55 PLN · przychody 182\u{a0}400,00 PLN", warning: true)
         try render(Fixtures.snapshot(yearSummary: summary), isLarge: false, name: "medium-summary-stale")
     }
 
     func testRenderMediumSummaryCurrency() throws {
         let summary = Snapshot.YearSummary(
-            text: "2026 (stan na 26.11 11:00) · wydatki 1\u{a0}234\u{a0}567,89 PLN + 12\u{a0}345,67 EUR"
+            text: "2026 netto (stan na 26.11 11:00) · wydatki 1\u{a0}234\u{a0}567,89 PLN + 12\u{a0}345,67 EUR"
                 + " · przychody 2\u{a0}345\u{a0}678,90 PLN + 1200,00 USD",
             warning: true)
         try render(Fixtures.snapshot(yearSummary: summary), isLarge: false, name: "medium-summary-currency")
@@ -76,7 +76,7 @@ final class RenderTests: XCTestCase {
 
     func testRenderMediumSummarySkipped() throws {
         let summary = Snapshot.YearSummary(
-            text: "2026 · wydatki 48\u{a0}210,55 PLN · przychody 182\u{a0}400,00 PLN · pominięte: 1", warning: true)
+            text: "2026 netto · wydatki 48\u{a0}210,55 PLN · przychody 182\u{a0}400,00 PLN · pominięte: 1", warning: true)
         try render(Fixtures.snapshot(yearSummary: summary), isLarge: false, name: "medium-summary-skipped")
     }
 
@@ -87,7 +87,7 @@ final class RenderTests: XCTestCase {
     }
 
     private static let plainSummary = Snapshot.YearSummary(
-        text: "2026 · wydatki 48\u{a0}210,55 PLN · przychody 182\u{a0}400,00 PLN", warning: false)
+        text: "2026 netto · wydatki 48\u{a0}210,55 PLN · przychody 182\u{a0}400,00 PLN", warning: false)
 
     private func render(_ snapshot: Snapshot, isLarge: Bool, name: String, dark: Bool = false, now: Date = Fixtures.now) throws {
         guard let directory = ProcessInfo.processInfo.environment["WIDGET_RENDER_DIR"] else {
