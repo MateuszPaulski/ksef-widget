@@ -13,7 +13,7 @@ private let quotedValueCharacters = 60
 // Both patterns guard values that become part of a path, so digits are ASCII only.
 nonisolated(unsafe) let ksefNumberPattern =
     /([1-9]([0-9][1-9]|[1-9][0-9])[0-9]{7})-(20[2-9][0-9]|2[1-9][0-9]{2}|[3-9][0-9]{3})(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])-([0-9A-F]{6})-?([0-9A-F]{6})-([0-9A-F]{2})/
-nonisolated(unsafe) private let issueDatePattern = /[0-9]{4}-[0-9]{2}-[0-9]{2}/
+nonisolated(unsafe) let issueDatePattern = /[0-9]{4}-[0-9]{2}-[0-9]{2}/
 
 typealias Query = @Sendable (Window, Int) async throws -> MetadataPage
 

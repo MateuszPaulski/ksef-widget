@@ -59,7 +59,7 @@ private struct State: Decodable {
     let checkpoint: String
 }
 
-private let newline = UInt8(ascii: "\n")
+let newline = UInt8(ascii: "\n")
 
 func readIfExists(_ url: URL) throws -> Data? {
     do {
@@ -74,7 +74,7 @@ func writeAtomic(_ data: Data, to url: URL) throws {
     try data.write(to: url, options: .atomic)
 }
 
-private func append(_ data: Data, to url: URL) throws {
+func append(_ data: Data, to url: URL) throws {
     guard FileManager.default.fileExists(atPath: url.path) else {
         try data.write(to: url)
         return
