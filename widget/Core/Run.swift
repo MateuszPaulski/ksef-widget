@@ -53,7 +53,7 @@ public func run(_ options: RunOptions) async -> RunSummary {
             http: http, credentials: credentials, nip: settings.nip, environment: settings.environment, now: now, sleep: options.sleep
         )
         let query: Query = { window, pageOffset in
-            try await queryMetadata(http: http, token: accessToken.token, window: window, pageOffset: pageOffset)
+            try await queryMetadata(http: http, token: accessToken.token, subject: .buyer, window: window, pageOffset: pageOffset)
         }
         let from = store.checkpoint ?? "\(settings.startDate)T00:00:00Z"
 

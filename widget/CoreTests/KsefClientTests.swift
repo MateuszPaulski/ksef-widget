@@ -23,7 +23,7 @@ final class KsefClientTests: XCTestCase {
         let (http, transport) = setup(.json(200, page), path: path, method: "POST")
         let from = "2026-11-25T08:00:00.1234567+00:00"
 
-        let result = try await queryMetadata(http: http, token: "tok", window: Window(from: from, to: nil), pageOffset: 2)
+        let result = try await queryMetadata(http: http, token: "tok", subject: .buyer, window: Window(from: from, to: nil), pageOffset: 2)
 
         XCTAssertEqual(result, MetadataPage(hasMore: false, isTruncated: false, permanentStorageHwmDate: "2026-11-26T06:59:00.1234567+00:00", invoices: []))
         let requests = await transport.requests
@@ -37,11 +37,41 @@ final class KsefClientTests: XCTestCase {
         ] as NSDictionary)
     }
 
+    func testQueriesSalesInvoicesAsSubject1() async throws {
+        let path = "/invoices/query/metadata?sortOrder=Asc&pageOffset=0&pageSize=250"
+        let (http, transport) = setup(.json(200, page), path: path, method: "POST")
+
+        _ = try await queryMetadata(http: http, token: "tok", subject: .seller, window: Window(from: "2026-01-01T00:00:00Z", to: nil), pageOffset: 0)
+
+        let requests = await transport.requests
+        XCTAssertEqual(try object(requests[0].body)["subjectType"] as? String, "Subject1")
+    }
+
+    func testDecodesTheSummaryFieldsWhenPresentAndNilWhenAbsent() throws {
+        func invoice(_ number: String, extra: String) -> String {
+            """
+            {"ksefNumber":"\(number)","invoiceNumber":"FV/1","issueDate":"2026-11-20","permanentStorageDate":"2026-11-20T10:00:00+00:00",\
+            "seller":{"nip":"5265877635","name":"Acme"},"grossAmount":53.63,"currency":"PLN","invoiceHash":"aGFzaA=="\(extra)}
+            """
+        }
+        let json = """
+        {"hasMore":false,"isTruncated":false,"permanentStorageHwmDate":null,"invoices":[
+        \(invoice("5265877635-20261120-0123456789AB-CD", extra: ",\"netAmount\":43.6,\"vatAmount\":10.03,\"invoiceType\":\"Kor\"")),
+        \(invoice("5265877635-20261120-0123456789AB-CE", extra: ""))]}
+        """
+
+        let page = try JSONDecoder().decode(MetadataPage.self, from: Data(json.utf8))
+
+        XCTAssertEqual(page.invoices.map(\.netAmount), [43.6, nil])
+        XCTAssertEqual(page.invoices.map(\.vatAmount), [10.03, nil])
+        XCTAssertEqual(page.invoices.map(\.invoiceType), ["Kor", nil])
+    }
+
     func testSendsToVerbatimWhenTheWindowHasOne() async throws {
         let path = "/invoices/query/metadata?sortOrder=Asc&pageOffset=0&pageSize=250"
         let (http, transport) = setup(.json(200, page), path: path, method: "POST")
 
-        _ = try await queryMetadata(http: http, token: "tok", window: Window(from: "2026-01-01T00:00:00Z", to: "2026-04-01T00:00:00.000Z"), pageOffset: 0)
+        _ = try await queryMetadata(http: http, token: "tok", subject: .buyer, window: Window(from: "2026-01-01T00:00:00Z", to: "2026-04-01T00:00:00.000Z"), pageOffset: 0)
 
         let requests = await transport.requests
         XCTAssertEqual(try object(requests[0].body), [
@@ -72,7 +102,7 @@ final class KsefClientTests: XCTestCase {
         let path = "/invoices/query/metadata?sortOrder=Asc&pageOffset=0&pageSize=250"
         let (http, _) = setup(.json(200, ["hasMore": true]), path: path, method: "POST")
         do {
-            _ = try await queryMetadata(http: http, token: "tok", window: Window(from: "2026-01-01T00:00:00Z", to: nil), pageOffset: 0)
+            _ = try await queryMetadata(http: http, token: "tok", subject: .buyer, window: Window(from: "2026-01-01T00:00:00Z", to: nil), pageOffset: 0)
             XCTFail("expected a decoding failure")
         } catch {
             XCTAssertEqual(errorMessage(error), "Nieprawidłowa odpowiedź KSeF na POST /invoices/query/metadata")

@@ -73,20 +73,50 @@ enum SyncOutcome: Equatable {
     case partial(String)
 }
 
-private func quoted(_ value: String) -> String {
+func quoted(_ value: String) -> String {
     String(JSONValue.string(value).compact().prefix(quotedValueCharacters))
+}
+
+/// Lists windows from `from`; `process` sees each window's invoices before its checkpoint is written,
+/// and a non-nil result ends the walk without writing it.
+func walkWindows(
+    from start: String, query: Query, now: @Sendable () -> Date,
+    process: ([InvoiceMetadata]) async throws -> SyncOutcome?,
+    writeCheckpoint: (String) throws -> Void
+) async throws -> SyncOutcome {
+    var from = start
+    do {
+        while true {
+            let window = nextWindow(from: from, now: now())
+            let (invoices, hwm) = try await listWindow(query, window)
+            if let outcome = try await process(invoices) { return outcome }
+
+            // A closed window (backfill) must report an HWM; an open one may not have one yet.
+            if let to = window.to, hwm == nil {
+                throw KsefError("Nieoczekiwany permanentStorageHwmDate (null) dla okna \(window.from) – \(to)")
+            }
+            guard let hwm else { return .complete }
+            // Everything up to a closed window's `to` is settled even if KSeF reports a later HWM.
+            var next = hwm
+            if let to = window.to, let hwmMillis = KsefTime.millis(hwm), let toMillis = KsefTime.millis(to), hwmMillis > toMillis {
+                next = to
+            }
+            try writeCheckpoint(next)
+            if window.to == nil || next == from { return .complete }
+            from = next
+        }
+    } catch let error as RateLimitError {
+        return .partial(errorMessage(error))
+    }
 }
 
 func syncInvoices(_ deps: SyncDeps) async throws -> SyncOutcome {
     let store = deps.store
-    var from = deps.from
     var lastDownloadAt: Int64?
 
-    do {
-        while true {
-            let window = nextWindow(from: from, now: deps.now())
-            let (invoices, hwm) = try await listWindow(deps.query, window)
-
+    return try await walkWindows(
+        from: deps.from, query: deps.query, now: deps.now,
+        process: { invoices in
             for invoice in invoices {
                 if store.has(invoice.ksefNumber) { continue }
                 guard invoice.ksefNumber.wholeMatch(of: ksefNumberPattern) != nil else {
@@ -115,22 +145,8 @@ func syncInvoices(_ deps: SyncDeps) async throws -> SyncOutcome {
                 try store.saveInvoice(invoice, xml: bytes)
                 deps.onSaved(invoice)
             }
-
-            // A closed window (backfill) must report an HWM; an open one may not have one yet.
-            if let to = window.to, hwm == nil {
-                throw KsefError("Nieoczekiwany permanentStorageHwmDate (null) dla okna \(window.from) – \(to)")
-            }
-            guard let hwm else { return .complete }
-            // Everything up to a closed window's `to` is settled even if KSeF reports a later HWM.
-            var next = hwm
-            if let to = window.to, let hwmMillis = KsefTime.millis(hwm), let toMillis = KsefTime.millis(to), hwmMillis > toMillis {
-                next = to
-            }
-            try store.writeCheckpoint(next)
-            if window.to == nil || next == from { return .complete }
-            from = next
-        }
-    } catch let error as RateLimitError {
-        return .partial(errorMessage(error))
-    }
+            return nil
+        },
+        writeCheckpoint: store.writeCheckpoint
+    )
 }

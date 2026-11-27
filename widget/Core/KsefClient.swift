@@ -16,6 +16,10 @@ public struct Seller: Codable, Equatable, Sendable {
     let name: String?
 }
 
+enum Subject: String, Decodable, Sendable {
+    case seller = "Subject1", buyer = "Subject2"
+}
+
 public struct InvoiceMetadata: Codable, Equatable, Sendable {
     let ksefNumber: String
     let invoiceNumber: String
@@ -25,6 +29,9 @@ public struct InvoiceMetadata: Codable, Equatable, Sendable {
     let grossAmount: Double
     let currency: String
     let invoiceHash: String  // SHA-256, Base64
+    var netAmount: Double?
+    var vatAmount: Double?
+    var invoiceType: String?
 }
 
 struct MetadataPage: Decodable, Equatable {
@@ -100,11 +107,11 @@ func authenticate(
     throw KsefError("Uwierzytelnienie w KSeF nie zakończyło się w \(authMaxPolls * authPollIntervalMs / 1000) s")
 }
 
-func queryMetadata(http: KsefHTTP, token: String, window: Window, pageOffset: Int) async throws -> MetadataPage {
+func queryMetadata(http: KsefHTTP, token: String, subject: Subject, window: Window, pageOffset: Int) async throws -> MetadataPage {
     var dateRange: [(String, JSONValue)] = [("dateType", .string("PermanentStorage")), ("from", .string(window.from))]
     if let to = window.to { dateRange.append(("to", .string(to))) }
     dateRange.append(("restrictToPermanentStorageHwmDate", .bool(true)))
-    let body = JSONValue.object([("subjectType", .string("Subject2")), ("dateRange", .object(dateRange))])
+    let body = JSONValue.object([("subjectType", .string(subject.rawValue)), ("dateRange", .object(dateRange))])
 
     let data = try await http.send(
         "POST", "/invoices/query/metadata?sortOrder=Asc&pageOffset=\(pageOffset)&pageSize=\(pageSize)", token: token, json: body
