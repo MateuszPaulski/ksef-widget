@@ -23,8 +23,8 @@ final class RunTests: XCTestCase {
     }
 
     private func rig(
-        invoices: [FakeInvoice] = [], authStatus: FakeAuthStatus? = nil, fetchError: (any Error)? = nil,
-        downloadStatus: (@Sendable (String) -> FakeDownloadAnswer?)? = nil,
+        invoices: [FakeInvoice] = [], salesInvoices: [FakeInvoice] = [], authStatus: FakeAuthStatus? = nil, fetchError: (any Error)? = nil,
+        downloadStatus: (@Sendable (String) -> FakeDownloadAnswer?)? = nil, metadataAnswer: (@Sendable (String) -> FakeDownloadAnswer?)? = nil,
         keyPassword: String? = nil, dryRun: Bool = false, notify: (@Sendable (String, String) async throws -> Void)? = nil
     ) -> Rig {
         let clock = FakeClock(START)
@@ -33,7 +33,7 @@ final class RunTests: XCTestCase {
         let snapshotURL = root.appendingPathComponent("widget-\(id).json")
         let fake = FakeKsef(FakeKsefOptions(
             invoices: invoices, hwm: HWM, now: { clock.now }, authStatus: authStatus,
-            downloadStatus: downloadStatus, fetchError: fetchError
+            downloadStatus: downloadStatus, fetchError: fetchError, salesInvoices: salesInvoices, metadataAnswer: metadataAnswer
         ))
         let notifications = Locked<[(title: String, message: String)]>([])
         let logs = Locked<[String]>([])
@@ -54,6 +54,10 @@ final class RunTests: XCTestCase {
 
     private func indexLines(_ dataDir: URL) throws -> [String] {
         try text(dataDir.appendingPathComponent("index.jsonl")).split(separator: "\n").map(String.init)
+    }
+
+    private func metadataQueries(_ r: Rig) async -> Int {
+        await r.fake.requests.filter { $0.path.hasPrefix("/invoices/query/metadata") }.count
     }
 
     private func state(_ dataDir: URL) throws -> NSDictionary {
@@ -493,6 +497,155 @@ final class RunTests: XCTestCase {
         XCTAssertThrowsError(try adoptDataFolder(other)) {
             XCTAssertEqual(errorMessage($0), mismatchMessage(nip: "5265877635", environment: "test"))
         }
+    }
+
+    private func ledgerLines(_ dataDir: URL) throws -> [String] {
+        try text(dataDir.appendingPathComponent("ledger.jsonl")).split(separator: "\n").map(String.init)
+    }
+
+    private func yearSummary(_ snapshotURL: URL) throws -> NSDictionary? {
+        try jsonObject(snapshotURL)["yearSummary"] as? NSDictionary
+    }
+
+    func testTheLedgerFollowsACompleteDownloadForBothSubjects() async throws {
+        let r = rig(invoices: [fakeInvoice(1)], salesInvoices: [fakeInvoice(7)])
+
+        let summary = await KsefCore.run(r.options)
+
+        XCTAssertEqual(summary.status, .complete)
+        XCTAssertEqual(try ledgerLines(r.dataDir), [
+            "{\"ksefNumber\":\"5265877635-20261120-000001123456-AB\",\"subjectType\":\"Subject2\",\"issueDate\":\"2026-11-20\","
+                + "\"invoiceType\":\"Vat\",\"currency\":\"PLN\",\"netAmount\":100,\"grossAmount\":100.5,\"vatAmount\":0.5}",
+            "{\"ksefNumber\":\"5265877635-20261120-000007123456-AB\",\"subjectType\":\"Subject1\",\"issueDate\":\"2026-11-20\","
+                + "\"invoiceType\":\"Vat\",\"currency\":\"PLN\",\"netAmount\":700,\"grossAmount\":700.5,\"vatAmount\":0.5}",
+        ])
+        XCTAssertEqual(
+            try jsonObject(r.dataDir.appendingPathComponent("ledger-state.json")) as NSDictionary,
+            ["Subject2": HWM, "Subject1": HWM, "completeAt": KsefTime.iso(r.clock.now)] as NSDictionary
+        )
+        XCTAssertEqual(
+            try yearSummary(r.snapshotURL),
+            ["text": "2026 · wydatki 100,00 PLN · przychody 700,00 PLN", "warning": false] as NSDictionary
+        )
+        XCTAssertEqual(r.logs.value.count, 1)
+    }
+
+    func testTheLedgerCostsOneQueryPerSubjectWhenIdle() async {
+        let r = rig(invoices: [fakeInvoice(1)])
+
+        _ = await KsefCore.run(r.options)
+        let first = await metadataQueries(r)
+        _ = await KsefCore.run(r.options)
+        let second = await metadataQueries(r)
+
+        XCTAssertEqual(first, 9)
+        XCTAssertEqual(second, 12)
+    }
+
+    func testAPartialDownloadSkipsTheLedger() async throws {
+        let invoices = [fakeInvoice(1), fakeInvoice(2)]
+        let second = invoices[1].metadata.ksefNumber
+        let r = rig(invoices: invoices, downloadStatus: { number in
+            number == second ? FakeDownloadAnswer(status: 429, headers: ["Retry-After": "900"]) : nil
+        })
+
+        let summary = await KsefCore.run(r.options)
+
+        XCTAssertEqual(summary.status, .partial)
+        let queries = await metadataQueries(r)
+        XCTAssertEqual(queries, 1)
+        XCTAssertFalse(exists(r.dataDir.appendingPathComponent("ledger.jsonl")))
+        XCTAssertEqual(try yearSummary(r.snapshotURL), ["text": "2026 · podsumowanie w przygotowaniu", "warning": true] as NSDictionary)
+    }
+
+    func testALedgerRateLimitLeavesTheRunCompleteAndSaysSoInTheFooter() async throws {
+        let limited = Locked(true)
+        let r = rig(invoices: [fakeInvoice(1)], metadataAnswer: { subject in
+            limited.value && subject == "Subject1" ? FakeDownloadAnswer(status: 429, headers: ["Retry-After": "900"]) : nil
+        })
+
+        let first = await KsefCore.run(r.options)
+
+        XCTAssertEqual(first.status, .complete)
+        XCTAssertEqual(first.saved.count, 1)
+        XCTAssertEqual(r.notifications.value.map(\.title), ["KSeF: 1 nowa faktura"])
+        XCTAssertFalse(try text(reportURL(r.dataDir)).contains("ledger"))
+        XCTAssertTrue(r.logs.value.contains("ledger Subject1 stopped: Limit zapytań KSeF — trzeba odczekać 900 s."))
+        let ledgerState = try jsonObject(r.dataDir.appendingPathComponent("ledger-state.json"))
+        XCTAssertNotNil(ledgerState["Subject2"])
+        XCTAssertNil(ledgerState["completeAt"])
+        XCTAssertEqual(try yearSummary(r.snapshotURL), ["text": "2026 · podsumowanie w przygotowaniu", "warning": true] as NSDictionary)
+
+        limited.value = false
+        _ = await KsefCore.run(r.options)
+
+        XCTAssertEqual(
+            try yearSummary(r.snapshotURL), ["text": "2026 · wydatki 100,00 PLN · przychody 0,00 PLN", "warning": false] as NSDictionary
+        )
+
+        limited.value = true
+        let third = await KsefCore.run(r.options)
+
+        XCTAssertEqual(third.status, .complete)
+        let footer = try XCTUnwrap(yearSummary(r.snapshotURL))
+        XCTAssertTrue((footer["text"] as? String ?? "").hasPrefix("2026 (stan na 26.11 08:0"))
+        XCTAssertEqual(footer["warning"] as? Bool, true)
+        XCTAssertEqual(r.notifications.value.count, 1)
+    }
+
+    func testNoSummaryFromAFolderOfAnotherIdentity() async throws {
+        let r = rig(invoices: [fakeInvoice(1)])
+        try writeIdentity(r.dataDir, nip: "1111111111", environment: "test")
+        let ledgerFile = r.dataDir.appendingPathComponent("ledger.jsonl")
+        let existing = Data("{\"ksefNumber\":\"x\"}\n".utf8)
+        try existing.write(to: ledgerFile)
+
+        let summary = await KsefCore.run(r.options)
+
+        XCTAssertEqual(summary.status, .failed)
+        XCTAssertNil(try jsonObject(r.snapshotURL)["yearSummary"])
+        XCTAssertEqual(try Data(contentsOf: ledgerFile), existing)
+    }
+
+    func testAFailedLoginStillWritesTheSummaryFromDisk() async throws {
+        let r = rig(authStatus: FakeAuthStatus(code: 460, description: "Błąd certyfikatu"))
+
+        _ = await KsefCore.run(r.options)
+
+        XCTAssertEqual(try yearSummary(r.snapshotURL), ["text": "2026 · podsumowanie w przygotowaniu", "warning": true] as NSDictionary)
+    }
+
+    func testADryRunNeverTouchesTheLedger() async {
+        let r = rig(invoices: [fakeInvoice(1)], dryRun: true)
+
+        _ = await KsefCore.run(r.options)
+
+        let queries = await metadataQueries(r)
+        XCTAssertEqual(queries, 1)
+        XCTAssertFalse(exists(r.dataDir.appendingPathComponent("ledger.jsonl")))
+        XCTAssertFalse(exists(r.dataDir.appendingPathComponent("ledger-state.json")))
+    }
+
+    func testAnExistingFolderKeepsItsFilesAndGainsTheLedger() async throws {
+        let r = rig(salesInvoices: [fakeInvoice(7)])
+        try writeIdentity(r.dataDir, nip: "5265877635", environment: "test")
+        let identity = r.dataDir.appendingPathComponent("identity.json")
+        let index = r.dataDir.appendingPathComponent("index.jsonl")
+        try Data((try FormatsFixture.load().indexLines.joined(separator: "\n") + "\n").utf8).write(to: index)
+        try Data("{\"checkpoint\":\"2026-11-26T05:00:00.0000000+00:00\"}\n".utf8).write(to: r.dataDir.appendingPathComponent("state.json"))
+        let identityBefore = try Data(contentsOf: identity)
+        let indexBefore = try Data(contentsOf: index)
+
+        let summary = await KsefCore.run(r.options)
+
+        XCTAssertEqual(summary.status, .complete)
+        XCTAssertEqual(try Data(contentsOf: identity), identityBefore)
+        XCTAssertEqual(try Data(contentsOf: index), indexBefore)
+        XCTAssertEqual(try text(r.dataDir.appendingPathComponent("state.json")), "{\"checkpoint\":\"\(HWM)\"}\n")
+        XCTAssertEqual(
+            Set(try FileManager.default.contentsOfDirectory(atPath: r.dataDir.path)),
+            ["identity.json", "index.jsonl", "ledger-state.json", "ledger.jsonl", "state.json"]
+        )
     }
 
     private let setupMessage = "Brak hasła klucza w Pęku kluczy (usługa local.ksef-daily-fetch.KsefWidget, konto key-password)"

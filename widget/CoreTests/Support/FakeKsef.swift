@@ -16,7 +16,8 @@ func fakeInvoice(_ n: Int) -> FakeInvoice {
         metadata: InvoiceMetadata(
             ksefNumber: "5265877635-20261120-\(String(format: "%06X", n))123456-AB", invoiceNumber: "FV/\(n)", issueDate: "2026-11-20",
             permanentStorageDate: "2026-11-20T09:0\(n):00.1234567+00:00", seller: Seller(nip: "1111111111", name: "Sprzedawca \(n)"),
-            grossAmount: Double(100 * n) + 0.5, currency: "PLN", invoiceHash: Data(SHA256.hash(data: xml)).base64EncodedString()
+            grossAmount: Double(100 * n) + 0.5, currency: "PLN", invoiceHash: Data(SHA256.hash(data: xml)).base64EncodedString(),
+            netAmount: Double(100 * n), vatAmount: 0.5, invoiceType: "Vat"
         ),
         xml: xml
     )
@@ -41,6 +42,8 @@ struct FakeKsefOptions: Sendable {
     var authStatus: FakeAuthStatus?
     var downloadStatus: (@Sendable (String) -> FakeDownloadAnswer?)?
     var fetchError: (any Error)?  // every request throws this
+    var salesInvoices: [FakeInvoice] = []
+    var metadataAnswer: (@Sendable (String) -> FakeDownloadAnswer?)? = nil  // called with the request's subjectType
 }
 
 private struct MetadataPageBody: Encodable {
@@ -103,7 +106,12 @@ actor FakeKsef: HTTPTransport {
             ], url: url)
         }
         if method == "POST", path.hasPrefix("/invoices/query/metadata") {
-            let body = MetadataPageBody(permanentStorageHwmDate: options.hwm, invoices: options.invoices.map(\.metadata))
+            let subject = (try? JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: Any])?["subjectType"] as? String
+            if let subject, let answer = options.metadataAnswer?(subject) {
+                return try reply(answer.status, body: Data(answer.body.utf8), headers: answer.headers, url: url)
+            }
+            let listed = subject == Subject.seller.rawValue ? options.salesInvoices : options.invoices
+            let body = MetadataPageBody(permanentStorageHwmDate: options.hwm, invoices: listed.map(\.metadata))
             return try reply(200, body: try JSONEncoder().encode(body), headers: ["Content-Type": "application/json"], url: url)
         }
         if method == "GET", path.hasPrefix("/invoices/ksef/") {

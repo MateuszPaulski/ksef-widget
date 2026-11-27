@@ -42,9 +42,12 @@ public func run(_ options: RunOptions) async -> RunSummary {
     let startedAt = now()
     var saved: [InvoiceMetadata] = []
     var summary: RunSummary
+    var folderChecked = false
+    var ledgerCompleted = false
 
     do {
         let hasMarker = try checkDataFolder(dataDir, settings: settings)
+        folderChecked = true
         if !hasMarker && !options.dryRun { try writeDataFolderMarker(dataDir, settings: settings) }
         let credentials = try loadCredentials(certificateURL: options.certificateURL, keyURL: options.keyURL, password: options.keyPassword)
         let store = try Store.open(dataDir: dataDir, now: now)
@@ -52,13 +55,15 @@ public func run(_ options: RunOptions) async -> RunSummary {
         let accessToken = try await authenticate(
             http: http, credentials: credentials, nip: settings.nip, environment: settings.environment, now: now, sleep: options.sleep
         )
-        let query: Query = { window, pageOffset in
-            try await queryMetadata(http: http, token: accessToken.token, subject: .buyer, window: window, pageOffset: pageOffset)
+        let query: (Subject) -> Query = { subject in
+            { window, pageOffset in
+                try await queryMetadata(http: http, token: accessToken.token, subject: subject, window: window, pageOffset: pageOffset)
+            }
         }
         let from = store.checkpoint ?? "\(settings.startDate)T00:00:00Z"
 
         if options.dryRun {
-            let (invoices, _) = try await listWindow(query, nextWindow(from: from, now: now()))
+            let (invoices, _) = try await listWindow(query(.buyer), nextWindow(from: from, now: now()))
             let notSaved = invoices.filter { !store.has($0.ksefNumber) }.count
             log("dry run: \(invoices.count) invoices in the first window, \(notSaved) not yet saved")
             return RunSummary(
@@ -70,7 +75,7 @@ public func run(_ options: RunOptions) async -> RunSummary {
         let outcome = try await syncInvoices(SyncDeps(
             from: from,
             store: store,
-            query: query,
+            query: query(.buyer),
             download: { try await downloadInvoice(http: http, token: accessToken.token, ksefNumber: $0) },
             tokenValidUntil: accessToken.validUntil,
             now: now,
@@ -80,6 +85,9 @@ public func run(_ options: RunOptions) async -> RunSummary {
         let (status, reason): (RunStatus, String?) = switch outcome {
         case .complete: (.complete, nil)
         case .partial(let reason): (.partial, reason)
+        }
+        if outcome == .complete {
+            ledgerCompleted = await updateLedger(dataDir: dataDir, query: query, now: now, log: log)
         }
         summary = RunSummary(startedAt: startedAt, status: status, reason: reason, failureKey: nil, saved: saved, checked: nil)
     } catch {
@@ -115,7 +123,10 @@ public func run(_ options: RunOptions) async -> RunSummary {
         log("could not read the index for the widget: \(errorMessage(error))")
     }
     writeSnapshotLogging(
-        buildSnapshot(status: summary.status, reason: summary.reason, failureKey: summary.failureKey, invoices: invoices, now: finishedAt),
+        buildSnapshot(
+            status: summary.status, reason: summary.reason, failureKey: summary.failureKey, invoices: invoices, now: finishedAt,
+            yearSummary: folderChecked ? yearSummary(dataDir: dataDir, ledgerCompleted: ledgerCompleted, now: finishedAt) : nil
+        ),
         to: options.snapshotURL, log: log
     )
     log("status=\(summary.status.rawValue) saved=\(summary.saved.count)\(summary.reason.map { " reason=\($0)" } ?? "")")

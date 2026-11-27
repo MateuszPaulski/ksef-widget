@@ -154,3 +154,35 @@ func syncLedger(
         writeCheckpoint: { try ledger.writeCheckpoint(subject, $0) }
     )
 }
+
+/// Never throws; true when both subjects reached the open window and completeAt was written.
+func updateLedger(
+    dataDir: URL, query: (Subject) -> Query, now: @Sendable () -> Date, log: @Sendable (String) -> Void
+) async -> Bool {
+    let ledger: Ledger
+    do {
+        ledger = try Ledger.open(dataDir: dataDir)
+    } catch {
+        log("ledger stopped: \(errorMessage(error))")
+        return false
+    }
+    let year = warsawYear(now())
+    for subject in [Subject.buyer, .seller] {
+        do {
+            if case .partial(let reason) = try await syncLedger(subject, ledger: ledger, query: query(subject), year: year, now: now) {
+                log("ledger \(subject.rawValue) stopped: \(reason)")
+                return false
+            }
+        } catch {
+            log("ledger \(subject.rawValue) stopped: \(errorMessage(error))")
+            return false
+        }
+    }
+    do {
+        try ledger.writeCompleteAt(now())
+    } catch {
+        log("ledger stopped: \(errorMessage(error))")
+        return false
+    }
+    return true
+}
