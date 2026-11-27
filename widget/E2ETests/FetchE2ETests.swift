@@ -55,9 +55,8 @@ final class FetchE2ETests: XCTestCase {
             nip: sellerNip, environment: .test, now: { Date() }, sleep: wait
         )
         let invoiceNumber = "E2E/\((0..<4).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined())"
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let template = try String(contentsOf: repositoryRoot.appendingPathComponent("test/fixtures/fa3-invoice.xml"), encoding: .utf8)
+        let templateURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/fa3-invoice.xml")
+        let template = try String(contentsOf: templateURL, encoding: .utf8)
         let xml = Data(
             template
                 .replacingOccurrences(of: "{{SELLER_NIP}}", with: sellerNip)

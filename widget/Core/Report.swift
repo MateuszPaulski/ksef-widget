@@ -35,7 +35,7 @@ private func reverseDate(_ issueDate: String, separator: String) -> String {
     issueDate.split(separator: "-", omittingEmptySubsequences: false).reversed().joined(separator: separator)
 }
 
-/// Everything outside the RFC 3986 unreserved set, byte by byte, so the Swift and TypeScript URLs stay identical.
+/// Everything outside the RFC 3986 unreserved set, byte by byte, so links match those already in the owner's reports (pinned by formats.json).
 private func encodePathSegment(_ text: String) -> String {
     text.utf8.map { byte in
         let isUnreserved = (48...57).contains(byte) || (65...90).contains(byte) || (97...122).contains(byte) || [45, 46, 95, 126].contains(byte)

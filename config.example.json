@@ -1,8 +1,0 @@
-{
-  "nip": "1234567890",
-  "environment": "prod",
-  "certificatePath": "/Users/YOU/.config/ksef-daily-fetch/ksef-auth.crt",
-  "keyPath": "/Users/YOU/.config/ksef-daily-fetch/ksef-auth.key",
-  "startDate": "2026-02-01",
-  "dataDir": "data"
-}

@@ -6,7 +6,7 @@ The owner is a Polish sole proprietor whose purchase invoices now arrive through
 
 After a run that found something, the owner gets one macOS notification, for example `KSeF: 2 nowe faktury` with a body like `Acme Sp. z o.o.: 1230,00 PLN; Beta S.A.: 53,63 EUR`, and a section appended to `reports/YYYY-MM-DD.md` in the invoice folder: for each invoice the seller, NIP, invoice number, gross amount with currency, issue date, a link to view it in KSeF and the KSeF number. A run with nothing new is silent. A partial or failed run notifies with the reason and appends it to the day's report; a failure that repeats the previous run's failure on the same day notifies only once, but the report and the widget still show it, so a failure is never silent. The one thing the app cannot do is announce that it is not running: then only the widget's stale banner shows it.
 
-Everything is set up in a settings window, with no terminal, no Node and no `config.json`. The TypeScript fetcher it replaces is still in `src/` as a fallback (see "Fallback: the TypeScript fetcher").
+Everything is set up in a settings window, with no terminal, no Node and no `config.json`.
 
 Design: `docs/superpowers/specs/2026-11-26-ksef-swift-app-design.md` (the app), `docs/superpowers/specs/2026-11-26-ksef-daily-fetch-design.md` (the fetcher rules the app ports) and `docs/superpowers/specs/2026-11-26-ksef-desktop-widget-design.md` (the widget); decisions: `ADR.md`.
 
@@ -67,18 +67,16 @@ Where things live (the widget can read only the snapshot, the last item):
 
 - `~/Library/Application Support/local.ksef-daily-fetch.KsefWidget/`, folder mode 0700: `settings.json`, `ksef-auth.crt` and `ksef-auth.key` (still encrypted), mode 0600.
 - Login Keychain: one item, service `local.ksef-daily-fetch.KsefWidget`, account `key-password`, label `KSeF — hasło klucza prywatnego`.
-- The invoice folder: `state.json` (checkpoint), `index.jsonl` (one line per saved invoice, also the dedup set), `invoices/YYYY/MM/<ksefNumber>.xml` and `reports/YYYY-MM-DD.md`. The formats are the same as the TypeScript fetcher's. The app adds `identity.json` (`{"nip", "environment"}`): a folder belongs to one NIP and environment, and a run or a check against another is refused with `Folder faktur zawiera dane innego podatnika lub środowiska`; a folder without the file (new, or written by the TypeScript fetcher) is adopted.
+- The invoice folder: `state.json` (checkpoint), `index.jsonl` (one line per saved invoice, also the dedup set), `invoices/YYYY/MM/<ksefNumber>.xml` and `reports/YYYY-MM-DD.md`. The app adds `identity.json` (`{"nip", "environment"}`): a folder belongs to one NIP and environment, and a run or a check against another is refused with `Folder faktur zawiera dane innego podatnika lub środowiska`; a folder without the file (new, or written by an earlier version) is adopted.
 - `~/Library/Application Support/ksef-daily-fetch/widget.json`: the widget snapshot, rewritten after every run.
 
 ## Running
 
 The app fetches when the last run is an hour or more old. A background tick every 15 minutes checks that, and so does every launch and every wake from sleep, so a Mac that slept through an hour catches up when it wakes; relaunching within the hour of the last run does not fetch again. Only one run happens at a time. The menu-bar icon shows the status line and offers **Pobierz teraz** (a manual fetch, regardless of the hour), **Ustawienia…**, **Otwórz folder faktur** and **Zakończ**.
 
-Notification rules are those of the TypeScript fetcher: nothing for a quiet complete run, one per run for new invoices (`KSeF: 2 nowe faktury`), partial or failed; a failed run with the same failure as the previous failed run on the same Europe/Warsaw day (a KSeF API error counts by its HTTP status alone, any other error by its message) does not notify again, so a lasting failure notifies once a day, not every hour. A problem that stops a run before it starts (damaged settings, unreadable credential files, missing Keychain item) is reported the same way and also writes a failed snapshot.
+Notification rules: nothing for a quiet complete run, one per run for new invoices (`KSeF: 2 nowe faktury`), partial or failed; a failed run with the same failure as the previous failed run on the same Europe/Warsaw day (a KSeF API error counts by its HTTP status alone, any other error by its message) does not notify again, so a lasting failure notifies once a day, not every hour. A problem that stops a run before it starts (damaged settings, unreadable credential files, missing Keychain item) is reported the same way and also writes a failed snapshot.
 
 KSeF allows 64 single-invoice downloads per hour, so the app never saves more than 60 invoices in any rolling hour, counting earlier runs too (from `savedAt` in `index.jsonl`). A large backfill that ends with a message ending in `pobrań na godzinę.` simply continues at the next hourly run.
-
-The app does not fetch while the old LaunchAgent is installed (see the fallback section); the menu says `Wstrzymane: zainstalowane jest stare zadanie launchd`. **Sprawdź połączenie** still works then.
 
 Logs go to the unified log; run lines look like `run finished trigger=… status=… saved=…`:
 
@@ -108,23 +106,21 @@ Troubleshooting:
 
 Update after a code change: `scripts/build-app.sh --install` again.
 
-## Fallback: the TypeScript fetcher
+## Leftovers of the old setup
 
-The original fetcher is still in `src/`, unchanged, until the owner confirms the app against production. **Only one of the two may run**: the download cap counts per invoice folder, so both together could exceed KSeF's limits. The app pauses while the LaunchAgent exists and fetches again at the next tick after it is removed:
+Only the owner runs these; nothing in the app needs them.
 
 ```sh
-scripts/launchagent.sh uninstall
+# in the main checkout of this repository
+rm config.json
+rm -rf node_modules
+ls data   # delete data/ only if it holds nothing you want
+# the old credential copies: first make sure the original .crt and .key are kept somewhere safe
+rm -r ~/.config/ksef-daily-fetch
+security delete-generic-password -s ksef-daily-fetch
+rm -f ~/Library/Logs/ksef-daily-fetch.log
+ls ~/Library/LaunchAgents | grep ksef   # expected: nothing (no LaunchAgent was installed)
 ```
-
-To use the fetcher instead (Node >= 22.18, pnpm; `pnpm install --frozen-lockfile`):
-
-- Put `ksef-auth.crt` and `ksef-auth.key` in `~/.config/ksef-daily-fetch/` (mode 700 folder, mode 600 files).
-- Store the key password: `security add-generic-password -s ksef-daily-fetch -a <NIP> -U -w` (macOS prompts twice, so it never appears in shell history).
-- `cp config.example.json config.json` and fill it in: `nip`, `environment` (`prod`), `certificatePath`, `keyPath` (absolute), `startDate` (`YYYY-MM-DD`), optional `dataDir` (default `data`). `config.json` is gitignored.
-- `node src/main.ts --test-notification` and `node src/main.ts --dry-run` check notifications and the login; `node src/main.ts` fetches once.
-- `scripts/launchagent.sh install` installs the hourly job (from a normal checkout, never from a `.claude/worktrees/…` path: the plist records the absolute path). Logs: `~/Library/Logs/ksef-daily-fetch.log`.
-
-The fetcher writes the same snapshot file, so the widget works with either.
 
 ## First-run checklist
 
@@ -139,7 +135,6 @@ Only the owner can verify these; the build was checked on the KSeF TEST environm
 7. After a day: hourly `run finished` lines in the log (command above), including one after a sleep.
 8. After one rebuild: note which prompts reappeared (Keychain, Documents, login item, notifications), ad hoc or Developer ID.
 9. Report the key's algorithm OIDs (`openssl asn1parse -in <key> | grep OBJECT`) and the certificate's issuer line (`/usr/bin/openssl x509 -in <crt> -noout -issuer -nameopt RFC2253,utf8,-esc_msb`).
-10. Once satisfied, confirm, so the TypeScript fetcher can be removed in a separate change.
 
 ## Troubleshooting
 
@@ -164,20 +159,16 @@ mkdir -p widget/build/renders && TEST_RUNNER_SETTINGS_RENDER_DIR="$PWD/widget/bu
 # against KSeF TEST only (network; not 16:00-18:00 Warsaw time, the TEST maintenance window)
 xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefE2ETests -destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build test -only-testing:KsefE2ETests/AuthE2ETests
 xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefE2ETests -destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build test -only-testing:KsefE2ETests/FetchE2ETests
-
-# the TypeScript fallback
-pnpm test
-pnpm typecheck
 ```
 
 `FetchE2ETests` takes 4–8 minutes, and TEST allows 20 metadata queries per hour, so run it at most twice an hour.
 
-The Swift fixtures in `widget/CoreTests/Fixtures/` come from the TypeScript code (throwaway self-signed TEST keys). After a change to `src/` formats, regenerate them with `node test/golden/make-vectors.ts widget/CoreTests/Fixtures` and rerun `KsefCoreTests`; the RSA signature must stay byte-identical.
+The fixtures in `widget/CoreTests/Fixtures/` are frozen outputs of the removed TypeScript implementation (see their README); the RSA signature must stay byte-identical to `xades-rsa.json`.
 
 What was verified, and where:
 
 - On the KSeF TEST environment: the XAdES login with an RSA and an EC self-signed certificate, and a full send, fetch and second run through the real `run()` (`KsefE2ETests`).
-- Offline: all `KsefCoreTests` (ports of the 142 TypeScript tests plus the settings, schedule and status line), `KsefWidgetTests`, `KsefAppTests` and `pnpm test`; the RSA XAdES output is byte-identical to the TypeScript signer's.
+- Offline: all `KsefCoreTests` (ports of the 142 TypeScript tests plus the settings, schedule and status line), `KsefWidgetTests` and `KsefAppTests`; the RSA XAdES output is byte-identical to the TypeScript signer's.
 - Not verified at all until the owner does it (first-run checklist): production login, the Keychain adapter and its prompt, the Documents prompt, notifications, the login item, the scheduler over a day, and the widget in the real widget host.
 
 Building or testing registers the built app with LaunchServices; unregister it afterwards (`scripts/build-app.sh` does this for its own build):

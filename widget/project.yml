@@ -40,7 +40,8 @@ targets:
     type: bundle.unit-test
     platform: macOS
     sources:
-      - E2ETests
+      - path: E2ETests
+        excludes: ["Fixtures/**"]
       - CoreTests/Support/TestCredentials.swift
       - CoreTests/Support/RandomNip.swift
       - CoreTests/Support/Fixtures.swift
