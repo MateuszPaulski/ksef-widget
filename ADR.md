@@ -16,3 +16,4 @@ Hard-to-reverse decisions for this project. One record per file in `docs/adr/`; 
 | [ADR-0010](docs/adr/0010-in-app-hourly-scheduler.md) | 2026-11-26 | accepted | In-app hourly scheduler, login item and native notifications instead of launchd and osascript |
 | [ADR-0011](docs/adr/0011-unsandboxed-host-app-and-secret-storage.md) | 2026-11-26 | accepted | Unsandboxed host app; credentials in its own folder, key password in the login Keychain |
 | [ADR-0012](docs/adr/0012-ad-hoc-signing-optional-developer-id.md) | 2026-11-26 | accepted | Ad-hoc signing by default; the owner may re-sign with their Developer ID through the build script |
+| [ADR-0013](docs/adr/0013-sales-metadata-and-year-ledger.md) | 2026-11-27 | accepted | The app also syncs sales-invoice metadata into a year ledger in the invoice folder |
