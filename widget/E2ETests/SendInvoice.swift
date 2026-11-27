@@ -83,6 +83,14 @@ private func symmetricKeyCertificatePublicKey(_ certificates: [PublicKeyCertific
     return (key, valid.publicKeyId)
 }
 
+func invoiceTemplate(_ name: String, replacing values: [String: String]) throws -> Data {
+    let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/\(name)")
+    let xml = values.reduce(try String(contentsOf: url, encoding: .utf8)) { text, value in
+        text.replacingOccurrences(of: "{{\(value.key)}}", with: value.value)
+    }
+    return Data(xml.utf8)
+}
+
 func sendTestInvoice(
     http: KsefHTTP, accessToken: String, xml: Data, sleep: @Sendable (Int) async -> Void
 ) async throws -> (ksefNumber: String, permanentStorageDate: String) {
