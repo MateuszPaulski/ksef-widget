@@ -12,6 +12,22 @@ final class SnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.invoices[0].seller, "Acme Sp. z o.o.")
     }
 
+    func testDecodesTheYearSummary() throws {
+        let summary = "2026 · wydatki 43,60 PLN · przychody 0,00 PLN"
+        let json = Fixtures.contractJSON.replacingOccurrences(
+            of: "\n    }\n  ]\n}",
+            with: "\n    }\n  ],\n  \"yearSummary\": {\"text\": \"\(summary)\", \"warning\": false}\n}")
+        XCTAssertNotEqual(json, Fixtures.contractJSON)
+        let snapshot = try SnapshotFile.decode(Data(json.utf8))
+        XCTAssertEqual(snapshot.yearSummary, Snapshot.YearSummary(text: summary, warning: false))
+    }
+
+    func testTheContractWithoutAYearSummaryHasNoFooter() throws {
+        let snapshot = try SnapshotFile.decode(Data(Fixtures.contractJSON.utf8))
+        XCTAssertNil(snapshot.yearSummary)
+        XCTAssertNil(WidgetModel.make(.success(snapshot), now: Fixtures.now).footer)
+    }
+
     func testDecodesWithoutMilliseconds() throws {
         let json = Fixtures.contractJSON.replacingOccurrences(of: "2026-11-26T13:00:41.123Z", with: "2026-11-26T13:00:41Z")
         let snapshot = try SnapshotFile.decode(Data(json.utf8))

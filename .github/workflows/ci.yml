@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    # The only hosted image with Xcode 27 (macOS 27, arm64); see actions/runner-images, images/macos/xcode-27-arm64-Readme.md.
+    runs-on: xcode-27
+    timeout-minutes: 45
+    env:
+      DESTINATION: platform=macOS,arch=arm64
+    steps:
+      # Full commit SHA of v7.0.1: a tag can be moved, a SHA cannot.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode 27.2
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.2.app
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Generate the Xcode project
+        run: xcodegen generate --spec widget/project.yml --project widget
+
+      - name: Test KsefCore
+        run: xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefCoreTests -destination "$DESTINATION" -derivedDataPath widget/build test
+
+      - name: Test the widget
+        run: xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefWidgetTests -destination "$DESTINATION" -derivedDataPath widget/build test
+
+      - name: Test the settings window
+        run: xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefAppTests -destination "$DESTINATION" -derivedDataPath widget/build test
+
+      # Compiled only: the E2E tests call the KSeF TEST API and never run in CI.
+      - name: Compile the E2E tests
+        run: xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefE2ETests -destination "$DESTINATION" -derivedDataPath widget/build build-for-testing
+
+      - name: Build the app and check it
+        run: scripts/build-app.sh

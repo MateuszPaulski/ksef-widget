@@ -1,0 +1,108 @@
+{
+  "now": "2026-11-26T13:00:39.123Z",
+  "invoices": [
+    {
+      "ksefNumber": "5265877635-20261120-0123456789AB-CD",
+      "invoiceNumber": "FV/1/2026",
+      "issueDate": "2026-11-20",
+      "permanentStorageDate": "2026-11-20T09:00:00.1234567+00:00",
+      "seller": {
+        "nip": "1111111111",
+        "name": "Acme Sp. z o.o."
+      },
+      "grossAmount": 1230,
+      "currency": "PLN",
+      "invoiceHash": "UtQp9Gpc51y+u3xApZjIjgkpZ01js+J8KflSPW8WzIE="
+    },
+    {
+      "ksefNumber": "5265877635-20261120-0123456789AC-CD",
+      "invoiceNumber": "FV/1/2026",
+      "issueDate": "2026-10-31",
+      "permanentStorageDate": "2026-11-20T09:00:00.1234567+00:00",
+      "seller": {
+        "nip": "1111111111",
+        "name": null
+      },
+      "grossAmount": 12345.675,
+      "currency": "EUR",
+      "invoiceHash": "UtQp9Gpc51y+u3xApZjIjgkpZ01js+J8KflSPW8WzIE="
+    },
+    {
+      "ksefNumber": "5265877635-20261120-0123456789AD-CD",
+      "invoiceNumber": "FV|1\n# x",
+      "issueDate": "2026-11-20",
+      "permanentStorageDate": "2026-11-20T09:00:00.1234567+00:00",
+      "seller": {
+        "nip": "1/2 (3)!*'ł",
+        "name": "Zakład \"Ł/ódź\" \\ <b>*x*</b>\n\ttab\u0001  ✓ https://evil.example WwW.evil.example www.www.x"
+      },
+      "grossAmount": -0.5,
+      "currency": "P_N",
+      "invoiceHash": "UtQp9Gpc51y+u3xApZjIjgkpZ01js+J8KflSPW8WzIE="
+    }
+  ],
+  "indexLines": [
+    "{\"ksefNumber\":\"5265877635-20261120-0123456789AB-CD\",\"invoiceNumber\":\"FV/1/2026\",\"issueDate\":\"2026-11-20\",\"sellerNip\":\"1111111111\",\"sellerName\":\"Acme Sp. z o.o.\",\"grossAmount\":1230,\"currency\":\"PLN\",\"permanentStorageDate\":\"2026-11-20T09:00:00.1234567+00:00\",\"invoiceHash\":\"UtQp9Gpc51y+u3xApZjIjgkpZ01js+J8KflSPW8WzIE=\",\"file\":\"invoices/2026/11/5265877635-20261120-0123456789AB-CD.xml\",\"savedAt\":\"2026-11-26T13:00:39.123Z\"}\n",
+    "{\"ksefNumber\":\"5265877635-20261120-0123456789AC-CD\",\"invoiceNumber\":\"FV/1/2026\",\"issueDate\":\"2026-10-31\",\"sellerNip\":\"1111111111\",\"sellerName\":null,\"grossAmount\":12345.675,\"currency\":\"EUR\",\"permanentStorageDate\":\"2026-11-20T09:00:00.1234567+00:00\",\"invoiceHash\":\"UtQp9Gpc51y+u3xApZjIjgkpZ01js+J8KflSPW8WzIE=\",\"file\":\"invoices/2026/10/5265877635-20261120-0123456789AC-CD.xml\",\"savedAt\":\"2026-11-26T13:00:39.123Z\"}\n",
+    "{\"ksefNumber\":\"5265877635-20261120-0123456789AD-CD\",\"invoiceNumber\":\"FV|1\\n# x\",\"issueDate\":\"2026-11-20\",\"sellerNip\":\"1/2 (3)!*'ł\",\"sellerName\":\"Zakład \\\"Ł/ódź\\\" \\\\ <b>*x*</b>\\n\\ttab\\u0001  ✓ https://evil.example WwW.evil.example www.www.x\",\"grossAmount\":-0.5,\"currency\":\"P_N\",\"permanentStorageDate\":\"2026-11-20T09:00:00.1234567+00:00\",\"invoiceHash\":\"UtQp9Gpc51y+u3xApZjIjgkpZ01js+J8KflSPW8WzIE=\",\"file\":\"invoices/2026/11/5265877635-20261120-0123456789AD-CD.xml\",\"savedAt\":\"2026-11-26T13:00:39.123Z\"}\n"
+  ],
+  "stateJson": "{\"checkpoint\":\"2026-11-26T07:00:00.1234567+00:00\"}\n",
+  "reportFile": "# Faktury z KSeF — 2026-11-26\n\n## Uruchomienie 14:00:39\n\nStatus: zakończone\nNowe faktury: 3\n\n- **Acme Sp. z o.o.** (NIP 1111111111) — nr FV/1/2026, 1230,00 PLN, wystawiona 20.11.2026 — [podgląd w KSeF](https://qr.ksef.mf.gov.pl/invoice/1111111111/20-11-2026/UtQp9Gpc51y-u3xApZjIjgkpZ01js-J8KflSPW8WzIE) — `5265877635-20261120-0123456789AB-CD`\n- **NIP 1111111111** (NIP 1111111111) — nr FV/1/2026, 12 345,68 EUR, wystawiona 31.10.2026 — [podgląd w KSeF](https://qr.ksef.mf.gov.pl/invoice/1111111111/31-10-2026/UtQp9Gpc51y-u3xApZjIjgkpZ01js-J8KflSPW8WzIE) — `5265877635-20261120-0123456789AC-CD`\n- **Zakład \"Ł/ódź\" \\\\ \\<b\\>\\*x\\*\\</b\\> \ttab\u0001  ✓ https\\://evil.example WwW\\.evil.example www\\.www\\.x** (NIP 1/2 (3)!\\*'ł) — nr FV\\|1 \\# x, -0,50 P\\_N, wystawiona 20.11.2026 — [podgląd w KSeF](https://qr.ksef.mf.gov.pl/invoice/1%2F2%20%283%29%21%2A%27%C5%82/20-11-2026/UtQp9Gpc51y-u3xApZjIjgkpZ01js-J8KflSPW8WzIE) — `5265877635-20261120-0123456789AD-CD`\n## Uruchomienie 14:00:39\n\nStatus: BŁĄD — Brak połączenia z KSeF: fetch failed\nNowe faktury: 1\n\n- **Acme Sp. z o.o.** (NIP 1111111111) — nr FV/1/2026, 1230,00 PLN, wystawiona 20.11.2026 — [podgląd w KSeF](https://qr-test.ksef.mf.gov.pl/invoice/1111111111/20-11-2026/UtQp9Gpc51y-u3xApZjIjgkpZ01js-J8KflSPW8WzIE) — `5265877635-20261120-0123456789AB-CD`\n",
+  "notifications": [
+    {
+      "title": "KSeF: 3 nowe faktury",
+      "message": "Acme Sp. z o.o.: 1230,00 PLN; NIP 1111111111: 12 345,68 EUR; Zakład \"Ł/ódź\" \\ <b>*x*</b>\n\ttab\u0001  ✓ https://evil.example WwW.evil.example www.www.x: -0,50 P_N"
+    },
+    {
+      "title": "KSeF: pobrano częściowo (1)",
+      "message": "Limit 60 pobrań na godzinę. Reszta przy następnym uruchomieniu."
+    },
+    {
+      "title": "KSeF: błąd pobierania faktur",
+      "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…"
+    }
+  ],
+  "snapshotJson": "{\n  \"updatedAt\": \"2026-11-26T13:00:39.123Z\",\n  \"status\": \"failed\",\n  \"reason\": \"Uwierzytelnienie w KSeF nieudane (kod 460: Błąd)\",\n  \"failureKey\": \"KSeF 500\",\n  \"today\": \"2026-11-26\",\n  \"savedToday\": 3,\n  \"invoices\": [\n    {\n      \"ksefNumber\": \"5265877635-20261120-0123456789AD-CD\",\n      \"seller\": \"Zakład \\\"Ł/ódź\\\" \\\\ <b>*x*</b>\\n\\ttab\\u0001  ✓ https://evil.example WwW.evil.example www.www.x\",\n      \"invoiceNumber\": \"FV|1\\n# x\",\n      \"amount\": \"-0,50 P_N\",\n      \"issueDate\": \"2026-11-20\",\n      \"savedAt\": \"2026-11-26T13:00:39.123Z\",\n      \"viewUrl\": \"https://qr.ksef.mf.gov.pl/invoice/1%2F2%20%283%29%21%2A%27%C5%82/20-11-2026/UtQp9Gpc51y-u3xApZjIjgkpZ01js-J8KflSPW8WzIE\"\n    },\n    {\n      \"ksefNumber\": \"5265877635-20261120-0123456789AC-CD\",\n      \"seller\": \"NIP 1111111111\",\n      \"invoiceNumber\": \"FV/1/2026\",\n      \"amount\": \"12 345,68 EUR\",\n      \"issueDate\": \"2026-10-31\",\n      \"savedAt\": \"2026-11-26T13:00:39.123Z\",\n      \"viewUrl\": \"https://qr.ksef.mf.gov.pl/invoice/1111111111/31-10-2026/UtQp9Gpc51y-u3xApZjIjgkpZ01js-J8KflSPW8WzIE\"\n    },\n    {\n      \"ksefNumber\": \"5265877635-20261120-0123456789AB-CD\",\n      \"seller\": \"Acme Sp. z o.o.\",\n      \"invoiceNumber\": \"FV/1/2026\",\n      \"amount\": \"1230,00 PLN\",\n      \"issueDate\": \"2026-11-20\",\n      \"savedAt\": \"2026-11-26T13:00:39.123Z\",\n      \"viewUrl\": \"https://qr.ksef.mf.gov.pl/invoice/1111111111/20-11-2026/UtQp9Gpc51y-u3xApZjIjgkpZ01js-J8KflSPW8WzIE\"\n    }\n  ]\n}\n",
+  "amounts": [
+    [
+      1230,
+      "1230,00 PLN"
+    ],
+    [
+      12345.67,
+      "12 345,67 PLN"
+    ],
+    [
+      1234567.891,
+      "1 234 567,89 PLN"
+    ],
+    [
+      0.125,
+      "0,13 PLN"
+    ],
+    [
+      1.005,
+      "1,01 PLN"
+    ],
+    [
+      2.675,
+      "2,68 PLN"
+    ],
+    [
+      -12345.675,
+      "-12 345,68 PLN"
+    ],
+    [
+      0,
+      "0,00 PLN"
+    ],
+    [
+      -0.001,
+      "-0,00 PLN"
+    ],
+    [
+      10,
+      "10,00 PLN"
+    ]
+  ]
+}

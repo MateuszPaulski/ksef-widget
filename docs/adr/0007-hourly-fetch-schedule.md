@@ -1,7 +1,7 @@
 # ADR-0007 — Fetch every hour instead of once a day
 
 Date: 2026-11-26
-Status: accepted
+Status: superseded by ADR-0010
 
 ## Context
 

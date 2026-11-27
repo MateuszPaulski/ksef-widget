@@ -41,6 +41,15 @@ struct InvoiceListView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
+            if let footer = model.footer {
+                Divider()
+                Text(verbatim: footer.text)
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(footer.warning ? Color.orange : Color.secondary)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+            }
         }
     }
 

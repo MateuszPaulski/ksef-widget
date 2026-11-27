@@ -45,7 +45,8 @@ enum Fixtures {
         invoiceCount: Int = 3,
         today: String = "2026-11-26",
         savedToday: Int = 2,
-        updatedAt: Date = Fixtures.updatedAt
+        updatedAt: Date = Fixtures.updatedAt,
+        yearSummary: Snapshot.YearSummary? = nil
     ) -> Snapshot {
         let invoices = rows.prefix(invoiceCount).enumerated().map { index, row in
             let day = row.issueDate.split(separator: "-").reversed().joined(separator: "-")
@@ -57,6 +58,6 @@ enum Fixtures {
                 viewUrl: "https://qr.ksef.mf.gov.pl/invoice/1111111111/\(day)/hash\(index + 1)"
             )
         }
-        return Snapshot(updatedAt: updatedAt, status: status, reason: reason, today: today, savedToday: savedToday, invoices: invoices)
+        return Snapshot(updatedAt: updatedAt, status: status, reason: reason, today: today, savedToday: savedToday, invoices: invoices, yearSummary: yearSummary)
     }
 }

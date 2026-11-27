@@ -1,7 +1,7 @@
 # ADR-0001 — TypeScript on Node 22, run daily by a local LaunchAgent
 
 Date: 2026-11-26
-Status: accepted
+Status: superseded by ADR-0008
 
 ## Context
 

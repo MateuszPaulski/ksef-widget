@@ -22,12 +22,19 @@ struct Snapshot: Decodable, Equatable, Sendable {
         let viewUrl: String
     }
 
+    struct YearSummary: Decodable, Equatable, Sendable {
+        let text: String
+        let warning: Bool
+    }
+
     let updatedAt: Date
     let status: Status
     let reason: String?
     let today: String
     let savedToday: Int
     let invoices: [Invoice]
+    // `var` so the memberwise init defaults it to nil; a `let` with a default would not be decoded.
+    var yearSummary: YearSummary?
 }
 
 enum SnapshotLoadError: Error, Equatable, Sendable {
