@@ -80,6 +80,12 @@ final class RenderTests: XCTestCase {
         try render(Fixtures.snapshot(yearSummary: summary), isLarge: false, name: "medium-summary-skipped")
     }
 
+    func testRenderLargeSummaryFailed() throws {
+        let reason = "Uwierzytelnienie w KSeF nieudane (kod 460: Uwierzytelnianie zakończone niepowodzeniem z powodu błędu certyfikatu — Certyfikat odwołany)"
+        let snapshot = Fixtures.snapshot(status: .failed, reason: reason, invoiceCount: 8, yearSummary: Self.plainSummary)
+        try render(snapshot, isLarge: true, name: "large-summary-failed")
+    }
+
     private static let plainSummary = Snapshot.YearSummary(
         text: "2026 · wydatki 48\u{a0}210,55 PLN · przychody 182\u{a0}400,00 PLN", warning: false)
 

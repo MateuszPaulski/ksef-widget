@@ -604,7 +604,8 @@ final class RunTests: XCTestCase {
         XCTAssertEqual(first.status, .complete)
         XCTAssertEqual(first.saved.count, 1)
         XCTAssertEqual(r.notifications.value.map(\.title), ["KSeF: 1 nowa faktura"])
-        XCTAssertFalse(try text(reportURL(r.dataDir)).contains("ledger"))
+        let report = try text(reportURL(r.dataDir))
+        XCTAssertFalse(report.contains("Limit zapytań") || report.contains("podsumowanie"))
         XCTAssertTrue(r.logs.value.contains("ledger Subject1 stopped: Limit zapytań KSeF — trzeba odczekać 900 s."))
         let ledgerState = try jsonObject(r.dataDir.appendingPathComponent("ledger-state.json"))
         XCTAssertNotNil(ledgerState["Subject2"])
@@ -681,6 +682,44 @@ final class RunTests: XCTestCase {
         _ = await KsefCore.run(r.options)
 
         XCTAssertEqual(try yearSummary(r.snapshotURL), ["text": "2026 · podsumowanie w przygotowaniu", "warning": true] as NSDictionary)
+
+        let withLedger = rig(authStatus: FakeAuthStatus(code: 460, description: "Błąd certyfikatu"))
+        try FileManager.default.createDirectory(at: withLedger.dataDir, withIntermediateDirectories: true)
+        let ledger = try Ledger.open(dataDir: withLedger.dataDir)
+        try ledger.add(ledgerEntry(fakeInvoice(1).metadata, subject: .buyer))
+        try ledger.add(ledgerEntry(fakeInvoice(7).metadata, subject: .seller))
+        try ledger.writeCheckpoint(.buyer, HWM)
+        try ledger.writeCheckpoint(.seller, HWM)
+        try ledger.writeCompleteAt(instant("2026-11-25T10:00:00Z"))
+
+        let failed = await KsefCore.run(withLedger.options)
+
+        XCTAssertEqual(failed.status, .failed)
+        XCTAssertEqual(
+            try yearSummary(withLedger.snapshotURL),
+            ["text": "2026 (stan na 25.11 11:00) · wydatki 100,00 PLN · przychody 700,00 PLN", "warning": true] as NSDictionary
+        )
+    }
+
+    func testAnUnreadableLedgerLeavesTheRunCompleteAndSaysSoInTheFooter() async throws {
+        let baseline = rig(invoices: [fakeInvoice(1)])
+        let r = rig(invoices: [fakeInvoice(1)])
+        _ = await KsefCore.run(baseline.options)
+        try FileManager.default.createDirectory(at: r.dataDir, withIntermediateDirectories: true)
+        try Data("{\"ksefNumber\":".utf8).write(to: r.dataDir.appendingPathComponent("ledger.jsonl"))
+
+        let summary = await KsefCore.run(r.options)
+
+        XCTAssertEqual(summary.status, .complete)
+        XCTAssertEqual(summary.saved.count, 1)
+        XCTAssertEqual(r.notifications.value.map(\.title), baseline.notifications.value.map(\.title))
+        XCTAssertEqual(r.notifications.value.map(\.message), baseline.notifications.value.map(\.message))
+        XCTAssertEqual(try text(reportURL(r.dataDir)), try text(reportURL(baseline.dataDir)))
+        XCTAssertTrue(r.logs.value.contains("ledger stopped: Uszkodzony plik ledger.jsonl, linia 1"))
+        XCTAssertEqual(
+            try yearSummary(r.snapshotURL),
+            ["text": "2026 · podsumowanie niedostępne: Uszkodzony plik ledger.jsonl, linia 1", "warning": true] as NSDictionary
+        )
     }
 
     func testADryRunNeverTouchesTheLedger() async {
