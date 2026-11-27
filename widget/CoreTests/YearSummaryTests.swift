@@ -52,7 +52,7 @@ final class YearSummaryTests: XCTestCase {
 
         XCTAssertEqual(
             line,
-            YearSummaryLine(text: "2026 · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR", warning: false)
+            YearSummaryLine(text: "2026 netto · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR", warning: false)
         )
     }
 
@@ -62,7 +62,7 @@ final class YearSummaryTests: XCTestCase {
         XCTAssertEqual(
             line,
             YearSummaryLine(
-                text: "2026 (stan na 26.11 11:00) · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR", warning: true
+                text: "2026 netto (stan na 26.11 11:00) · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR", warning: true
             )
         )
     }
@@ -98,7 +98,7 @@ final class YearSummaryTests: XCTestCase {
 
         let line = yearSummary(dataDir: dir, ledgerCompleted: true, now: instant("2026-12-31T23:30:00Z"))
 
-        XCTAssertEqual(line, YearSummaryLine(text: "2027 · wydatki 5,00 PLN · przychody 0,00 PLN", warning: false))
+        XCTAssertEqual(line, YearSummaryLine(text: "2027 netto · wydatki 5,00 PLN · przychody 0,00 PLN", warning: false))
     }
 
     func testSkippedInvoicesOfTheYearAreCounted() throws {
@@ -111,13 +111,13 @@ final class YearSummaryTests: XCTestCase {
         XCTAssertEqual(
             yearSummary(dataDir: dir, ledgerCompleted: true, now: NOW),
             YearSummaryLine(
-                text: "2026 · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR · pominięte: 2", warning: true
+                text: "2026 netto · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR · pominięte: 2", warning: true
             )
         )
         XCTAssertEqual(
             yearSummary(dataDir: dir, ledgerCompleted: false, now: NOW),
             YearSummaryLine(
-                text: "2026 (stan na 26.11 11:00) · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR · pominięte: 2",
+                text: "2026 netto (stan na 26.11 11:00) · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR · pominięte: 2",
                 warning: true
             )
         )
@@ -128,7 +128,7 @@ final class YearSummaryTests: XCTestCase {
 
         XCTAssertEqual(
             yearSummary(dataDir: dir, ledgerCompleted: true, now: NOW),
-            YearSummaryLine(text: "2026 · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR", warning: false)
+            YearSummaryLine(text: "2026 netto · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR", warning: false)
         )
     }
 

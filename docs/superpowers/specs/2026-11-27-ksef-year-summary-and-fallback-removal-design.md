@@ -15,7 +15,7 @@ KSeF · zaktualizowano 14:00              2 nowe dziś
 Acme Sp. z o.o.          1230,00 PLN    26.11
 Orange Polska              89,99 PLN    25.11
 ────────────────────────────────────────────────
-2026 · wydatki 48 210,55 PLN · przychody 182 400,00 PLN
+2026 netto · wydatki 48 210,55 PLN · przychody 182 400,00 PLN
 ```
 
 Approved rules: expenses = purchase invoices (the owner is the buyer, `Subject2`); incomes = sales invoices (the owner is the seller, `Subject1`), which the app has never fetched, so it adds an hourly metadata query for them and keeps only summary data (no XML, no notification, no report entry); net amounts in the summary, invoice rows stay gross; year by issue date, current calendar year in Europe/Warsaw; correcting invoices count with their sign; PLN in the total and other currencies as separate sums (`+ 1 200,00 EUR`), never converted; the medium widget shows two invoice rows instead of three, the large widget keeps its rows. Accepted limits: totals cover only what is in KSeF; the TypeScript code does not get this.
@@ -132,8 +132,8 @@ One incremental metadata sync per subject, on the same window, paging and checkp
 
   | State | `text` | `warning` |
   |---|---|---|
-  | this run completed both subjects | `2026 · wydatki 48 210,55 PLN · przychody 182 400,00 PLN` | false |
-  | not completed this run, `completeAt` exists | `2026 (stan na 26.11 11:00) · wydatki … · przychody …` (`completeAt` in Warsaw, `DD.MM HH:mm`) | true |
+  | this run completed both subjects | `2026 netto · wydatki 48 210,55 PLN · przychody 182 400,00 PLN` | false |
+  | not completed this run, `completeAt` exists | `2026 netto (stan na 26.11 11:00) · wydatki … · przychody …` (`completeAt` in Warsaw, `DD.MM HH:mm`) | true |
   | never completed (no `completeAt`, or one from before the year's start, treated as missing when this run did not complete the ledger) | `2026 · podsumowanie w przygotowaniu` | true |
   | `ledger.jsonl` or `ledger-state.json` unreadable | `2026 · podsumowanie niedostępne: Uszkodzony plik ledger.jsonl, linia 3` (or `Uszkodzony plik ledger-state.json`) | true |
 

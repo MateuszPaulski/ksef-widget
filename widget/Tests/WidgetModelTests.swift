@@ -118,7 +118,7 @@ final class WidgetModelTests: XCTestCase {
     }
 
     func testFooterCopiesTheSummary() {
-        let text = "2026 (stan na 26.11 11:00) · wydatki 43,60 PLN · przychody 0,00 PLN"
+        let text = "2026 netto (stan na 26.11 11:00) · wydatki 43,60 PLN · przychody 0,00 PLN"
         let summary = Snapshot.YearSummary(text: text, warning: true)
         let footer = WidgetModel.Footer(text: text, warning: true)
         XCTAssertEqual(make(Fixtures.snapshot(yearSummary: summary)).footer, footer)
@@ -129,7 +129,7 @@ final class WidgetModelTests: XCTestCase {
     }
 
     func testRowLimitWithAFooter() {
-        let summary = Snapshot.YearSummary(text: "2026 · wydatki 0,00 PLN · przychody 0,00 PLN", warning: false)
+        let summary = Snapshot.YearSummary(text: "2026 netto · wydatki 0,00 PLN · przychody 0,00 PLN", warning: false)
         XCTAssertEqual(make(Fixtures.snapshot(yearSummary: summary)).rowLimit(isLarge: false), 2)
         XCTAssertEqual(make(Fixtures.snapshot(status: .partial, yearSummary: summary)).rowLimit(isLarge: false), 1)
         XCTAssertEqual(make(Fixtures.snapshot(yearSummary: summary)).rowLimit(isLarge: true), 8)

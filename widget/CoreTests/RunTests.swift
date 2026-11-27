@@ -525,7 +525,7 @@ final class RunTests: XCTestCase {
         )
         XCTAssertEqual(
             try yearSummary(r.snapshotURL),
-            ["text": "2026 · wydatki 100,00 PLN · przychody 700,00 PLN", "warning": false] as NSDictionary
+            ["text": "2026 netto · wydatki 100,00 PLN · przychody 700,00 PLN", "warning": false] as NSDictionary
         )
         XCTAssertEqual(r.logs.value.count, 1)
     }
@@ -616,7 +616,7 @@ final class RunTests: XCTestCase {
         _ = await KsefCore.run(r.options)
 
         XCTAssertEqual(
-            try yearSummary(r.snapshotURL), ["text": "2026 · wydatki 100,00 PLN · przychody 0,00 PLN", "warning": false] as NSDictionary
+            try yearSummary(r.snapshotURL), ["text": "2026 netto · wydatki 100,00 PLN · przychody 0,00 PLN", "warning": false] as NSDictionary
         )
 
         limited.value = true
@@ -624,7 +624,7 @@ final class RunTests: XCTestCase {
 
         XCTAssertEqual(third.status, .complete)
         let footer = try XCTUnwrap(yearSummary(r.snapshotURL))
-        XCTAssertTrue((footer["text"] as? String ?? "").hasPrefix("2026 (stan na 26.11 08:0"))
+        XCTAssertTrue((footer["text"] as? String ?? "").hasPrefix("2026 netto (stan na 26.11 08:0"))
         XCTAssertEqual(footer["warning"] as? Bool, true)
         XCTAssertEqual(r.notifications.value.count, 1)
     }
@@ -656,7 +656,7 @@ final class RunTests: XCTestCase {
         )
         XCTAssertEqual(
             try yearSummary(r.snapshotURL),
-            ["text": "2026 · wydatki 100,00 PLN · przychody 700,00 PLN · pominięte: 1", "warning": true] as NSDictionary
+            ["text": "2026 netto · wydatki 100,00 PLN · przychody 700,00 PLN · pominięte: 1", "warning": true] as NSDictionary
         )
         let reason = "Nieprawidłowe metadane faktury \"\(skipped)\" do podsumowania roku"
         XCTAssertEqual(r.logs.value.filter { $0.hasPrefix("ledger") }, ["ledger Subject1 skipped \"\(skipped)\": \(reason)"])
@@ -697,7 +697,7 @@ final class RunTests: XCTestCase {
         XCTAssertEqual(failed.status, .failed)
         XCTAssertEqual(
             try yearSummary(withLedger.snapshotURL),
-            ["text": "2026 (stan na 25.11 11:00) · wydatki 100,00 PLN · przychody 700,00 PLN", "warning": true] as NSDictionary
+            ["text": "2026 netto (stan na 25.11 11:00) · wydatki 100,00 PLN · przychody 700,00 PLN", "warning": true] as NSDictionary
         )
     }
 

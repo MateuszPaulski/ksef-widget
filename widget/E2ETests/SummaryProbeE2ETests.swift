@@ -82,6 +82,6 @@ final class SummaryProbeE2ETests: XCTestCase {
         trace("EUR vatAmount=\(foreignLine["vatAmount"] ?? "?") (98.42 means PLN, 23 means EUR)")
 
         let summary = try snapshotYearSummary(snapshotURL)
-        XCTAssertEqual(summary.text, "\(issueDate.prefix(4)) · wydatki 0,00 PLN · przychody 0,00 PLN + 100,00 EUR")
+        XCTAssertEqual(summary.text, "\(issueDate.prefix(4)) netto · wydatki 0,00 PLN · przychody 0,00 PLN + 100,00 EUR")
     }
 }
