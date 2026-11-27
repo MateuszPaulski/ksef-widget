@@ -140,4 +140,13 @@ final class YearSummaryTests: XCTestCase {
             YearSummaryLine(text: "2026 · podsumowanie w przygotowaniu", warning: true)
         )
     }
+
+    func testACompletionTimeFromBeforeThisYearDoesNotCount() throws {
+        let dir = try folder([entry(.buyer, "2027-01-01", net: 5)], completeAt: "2026-12-31T22:00:00Z")
+
+        XCTAssertEqual(
+            yearSummary(dataDir: dir, ledgerCompleted: false, now: instant("2026-12-31T23:30:00Z")),
+            YearSummaryLine(text: "2027 · podsumowanie w przygotowaniu", warning: true)
+        )
+    }
 }

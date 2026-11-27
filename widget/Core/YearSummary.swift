@@ -27,7 +27,9 @@ func yearSummary(dataDir: URL, ledgerCompleted: Bool, now: Date) -> YearSummaryL
     } catch {
         return YearSummaryLine(text: "\(year) · podsumowanie niedostępne: \(errorMessage(error))", warning: true)
     }
-    guard let completedAt = ledger.completeAt.flatMap(KsefTime.millis) else {
+    // A completion time from an earlier year says nothing about this year's totals; a run that just completed has a fresh one.
+    let yearBegins = KsefTime.millis(yearStart(year)) ?? .min
+    guard let completedAt = ledger.completeAt.flatMap(KsefTime.millis), ledgerCompleted || completedAt >= yearBegins else {
         return YearSummaryLine(text: "\(year) · podsumowanie w przygotowaniu", warning: true)
     }
 
