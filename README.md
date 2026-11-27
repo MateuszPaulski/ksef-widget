@@ -76,18 +76,18 @@ Where things live (the widget can read only the snapshot, the last item):
 
 - `~/Library/Application Support/local.ksef-daily-fetch.KsefWidget/`, folder mode 0700: `settings.json`, `ksef-auth.crt` and `ksef-auth.key` (still encrypted), mode 0600.
 - Login Keychain: one item, service `local.ksef-daily-fetch.KsefWidget`, account `key-password`, label `KSeF — hasło klucza prywatnego`.
-- The invoice folder: `state.json` (checkpoint), `index.jsonl` (one line per saved invoice, also the dedup set), `invoices/YYYY/MM/<ksefNumber>.xml` and `reports/YYYY-MM-DD.md`, plus the year summary's two files: `ledger.jsonl` (append-only, one line per purchase or sales invoice of the year with its KSeF number, side, issue date, type, currency and net, gross and VAT amounts) and `ledger-state.json` (the checkpoint of each side and the time of the last complete refresh). The app adds `identity.json` (`{"nip", "environment"}`): a folder belongs to one NIP and environment, and a run or a check against another is refused with `Folder faktur zawiera dane innego podatnika lub środowiska`; a folder without the file (new, or written by an earlier version) is adopted.
+- The invoice folder: `state.json` (checkpoint), `index.jsonl` (one line per saved invoice, also the dedup set), `invoices/YYYY/MM/<ksefNumber>.xml` and `reports/YYYY-MM-DD.md`, plus the year summary's two files: `ledger.jsonl` (append-only, one line per purchase or sales invoice of the year with its KSeF number, side, issue date, type, currency and net, gross and VAT amounts) and `ledger-state.json` (the checkpoint of each side, the time of the last complete refresh and the `skipped` invoices, see Desktop widget). The app adds `identity.json` (`{"nip", "environment"}`): a folder belongs to one NIP and environment, and a run or a check against another is refused with `Folder faktur zawiera dane innego podatnika lub środowiska`; a folder without the file (new, or written by an earlier version) is adopted.
 - `~/Library/Application Support/ksef-daily-fetch/widget.json`: the widget snapshot, rewritten after every run.
 
 ## Running
 
 The app fetches when the last run is an hour or more old. A background tick every 15 minutes checks that, and so does every launch and every wake from sleep, so a Mac that slept through an hour catches up when it wakes; relaunching within the hour of the last run does not fetch again. Only one run happens at a time. The menu-bar icon shows the status line and offers **Pobierz teraz** (a manual fetch, regardless of the hour), **Ustawienia…**, **Otwórz folder faktur** and **Zakończ**.
 
-Notification rules: nothing for a quiet complete run, one per run for new invoices (`KSeF: 2 nowe faktury`), partial or failed; a failed run with the same failure as the previous failed run on the same Europe/Warsaw day (a KSeF API error counts by its HTTP status alone, any other error by its message) does not notify again, so a lasting failure notifies once a day, not every hour. A problem that stops a run before it starts (damaged settings, unreadable credential files, missing Keychain item) is reported the same way and also writes a failed snapshot.
+Notification rules: nothing for a quiet complete run, one per run for new invoices (`KSeF: 2 nowe faktury`), partial or failed; a failed run with the same failure as the previous failed run on the same Europe/Warsaw day (a KSeF API error counts by its HTTP status alone, any other error by its message) does not notify again, so a lasting failure notifies once a day, not every hour. The notification and the report section for new invoices are written as soon as the download ends, before the year summary is updated, so they never wait for it. A problem that stops a run before it starts (damaged settings, unreadable credential files, missing Keychain item) is reported the same way and also writes a failed snapshot.
 
 KSeF allows 64 single-invoice downloads per hour, so the app never saves more than 60 invoices in any rolling hour, counting earlier runs too (from `savedAt` in `index.jsonl`). A large backfill that ends with a message ending in `pobrań na godzinę.` simply continues at the next hourly run.
 
-KSeF also allows 20 metadata queries per hour. An idle hourly run uses 3 of them (one for the purchase download, one for each side of the year summary), the first run after the update up to 9 (up to 11 from 27 December: one download query plus up to 5 year windows per side, up to 4 before that date), and each **Pobierz teraz** 3. The year summary pauses 500 ms before each of its queries, so that KSeF's limit of 8 queries per second is never approached. Reaching the limit stops only the summary update, which continues at the next hourly run; the download always runs first and its outcome never depends on the summary.
+KSeF also allows 20 metadata queries per hour. An idle hourly run uses 3 of them (one for the purchase download, one for each side of the year summary), the first run after the update up to 9 (up to 11 from 27 December: one download query plus up to 5 year windows per side, up to 4 before that date), and each **Pobierz teraz** 3. The year summary pauses 500 ms before each of its queries, so that KSeF's limit of 8 queries per second is never approached. The download always runs first, and a summary that stops never changes the run's status, notification or report. But the summary shares KSeF's budget of 20 queries per hour, at 3 per run instead of 1: many **Pobierz teraz** presses within an hour can use it up, and the next download is then partial (with KSeF's rate-limit reason; it resumes at the next hourly run). Reaching the limit during the summary update stops only that update, which continues at the next hourly run.
 
 Logs go to the unified log; run lines look like `run finished trigger=… status=… saved=…`:
 
@@ -113,6 +113,14 @@ The year summary line is one of four, in the widget's secondary colour (orange w
 - `2026 (stan na 26.11 11:00) · wydatki … · przychody …`: orange; the last run did not complete the refresh (a limit, a failure, or a partial download), so the totals are as of the time shown, in Warsaw time, and the next complete run clears it.
 - `2026 · podsumowanie w przygotowaniu`: orange; the ledger has not yet completed once, for example right after the update, so no total is shown.
 - `2026 · podsumowanie niedostępne: …`: orange; a ledger file cannot be read, with the reason (see Troubleshooting).
+
+The first two lines can end with ` · pominięte: N` (orange): N invoices of the year, purchase or sales, were left out of the totals because KSeF's metadata for them is incomplete or invalid, for example a missing net amount. The invoices themselves are downloaded and reported as usual; only the summary skips them. The skipped invoices are listed under `skipped` in `ledger-state.json`, and the app logs each one once, when it first skips it:
+
+```sh
+/usr/bin/log show --last 1d --predicate 'subsystem == "local.ksef-daily-fetch.app" AND eventMessage CONTAINS "ledger"'
+```
+
+The lines look like `ledger Subject1 skipped "<KSeF number>": …` (`Subject2` is a purchase invoice, `Subject1` a sales invoice).
 
 With the summary the medium widget shows two invoice rows instead of three (one under a banner); the large widget keeps eight. After a setup failure (no settings, unreadable credential files, missing Keychain item) there is no summary line until the next run.
 
@@ -155,7 +163,7 @@ The year summary and the removal of the TypeScript fetcher are installed by buil
 
 ## Troubleshooting
 
-- `podsumowanie niedostępne: Uszkodzony plik ledger.jsonl, linia N`: that line of `ledger.jsonl` is damaged (for example a torn last line). Delete that line; or delete both `ledger.jsonl` and `ledger-state.json` and the next run rebuilds them from 1 January (up to 11 metadata queries). `Uszkodzony plik ledger-state.json` is handled the same way.
+- `podsumowanie niedostępne: Uszkodzony plik ledger.jsonl, linia N`: that line of `ledger.jsonl` is damaged (for example a torn last line). Quit the app, delete both `ledger.jsonl` and `ledger-state.json` in the invoice folder, and start the app: the year is read again from 1 January (up to 11 metadata queries). Deleting only the damaged line would not help, because the checkpoint has already passed it and the invoice would never come back. `Uszkodzony plik ledger-state.json` is handled the same way.
 - A corrupt line in `index.jsonl` fails the run loudly (`Uszkodzony plik index.jsonl, linia N`). The XML stays on disk; delete or fix that line and the next run downloads the invoice again.
 - `Token dostępu wkrótce wygaśnie.`: the run ended early because the access token was about to expire; the next run continues.
 - A failed run appends a `BŁĄD` section to the day's report and notifies, except when it repeats the previous failed run's reason on the same Europe/Warsaw day.

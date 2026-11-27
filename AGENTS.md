@@ -8,7 +8,7 @@ A personal macOS tool: `KSeF.app`, a native menu-bar app that every hour fetches
 - `xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefCoreTests -destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build test` — offline tests of `KsefCore`
 - the same with `-scheme KsefWidgetTests` — widget tests (prefix with `TEST_RUNNER_WIDGET_RENDER_DIR=<dir>` to also write PNG renders)
 - the same with `-scheme KsefAppTests` — settings window tests (prefix with `TEST_RUNNER_SETTINGS_RENDER_DIR=<dir>` to write PNG renders)
-- the same with `-scheme KsefE2ETests` — KSeF TEST only: `-only-testing:KsefE2ETests/AuthE2ETests` (login) `…/FetchE2ETests` (full fetch, both sides, 4–8 minutes) or `…/SummaryProbeE2ETests` (correction and EUR invoice)
+- the same with `-scheme KsefE2ETests` — KSeF TEST only: `-only-testing:KsefE2ETests/AuthE2ETests` (login), `…/FetchE2ETests` (full fetch, both sides, 4–8 minutes) or `…/SummaryProbeE2ETests` (correction and EUR invoice)
 - `scripts/build-app.sh` — the build, signature check and printed designated requirement; agents run it without arguments only, never with `--install` or an identity
 
 ## Rules
@@ -30,7 +30,7 @@ A personal macOS tool: `KSeF.app`, a native menu-bar app that every hour fetches
 
 ## State
 
-The app folder `~/Library/Application Support/local.ksef-daily-fetch.KsefWidget/` (folder 0700): `settings.json`, `ksef-auth.crt`, `ksef-auth.key` (0600); the key password is one generic-password item in the login Keychain. Under the invoice folder (default `~/Documents/KSeF`, unchanged formats): `identity.json` (the NIP and environment the folder belongs to; app only), `state.json` (checkpoint), `index.jsonl` (append-only, one line per saved invoice, also the dedup set), `ledger.jsonl` (append-only, one line per purchase or sales invoice of the year: metadata and amounts only) and `ledger-state.json` (checkpoint per side and `completeAt`), `invoices/YYYY/MM/<ksefNumber>.xml` (bytes exactly as KSeF returned them), `reports/YYYY-MM-DD.md` (a day can hold several sections). Outside both: `~/Library/Application Support/ksef-daily-fetch/widget.json` (widget snapshot, rewritten after every run).
+The app folder `~/Library/Application Support/local.ksef-daily-fetch.KsefWidget/` (folder 0700): `settings.json`, `ksef-auth.crt`, `ksef-auth.key` (0600); the key password is one generic-password item in the login Keychain. Under the invoice folder (default `~/Documents/KSeF`, unchanged formats): `identity.json` (the NIP and environment the folder belongs to; app only), `state.json` (checkpoint), `index.jsonl` (append-only, one line per saved invoice, also the dedup set), `ledger.jsonl` (append-only, one line per purchase or sales invoice of the year: metadata and amounts only) and `ledger-state.json` (checkpoint per side, `completeAt` and the `skipped` invoices the ledger could not sum), `invoices/YYYY/MM/<ksefNumber>.xml` (bytes exactly as KSeF returned them), `reports/YYYY-MM-DD.md` (a day can hold several sections). Outside both: `~/Library/Application Support/ksef-daily-fetch/widget.json` (widget snapshot, rewritten after every run).
 
 ## Known follow-ups
 
