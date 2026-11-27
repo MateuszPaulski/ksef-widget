@@ -4,7 +4,7 @@
 # Usage: scripts/build-app.sh [--install] [signing-identity]
 
 REPO=${0:A:h:h}
-LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+source ${0:A:h}/install-app.zsh || exit 1
 INSTALL=0
 IDENTITY=
 
@@ -50,12 +50,7 @@ echo "signature verified; designated requirement (cdhash = ad hoc, certificate l
 codesign -dr - "$APP" 2>&1 | grep designated
 
 if (( INSTALL )); then
-  osascript -e 'quit app id "local.ksef-daily-fetch.KsefWidget"' 2>/dev/null
-  mkdir -p ~/Applications || exit 1
-  rm -rf ~/Applications/KSeF.app ~/Applications/KsefWidget.app
-  ditto "$APP" ~/Applications/KSeF.app || exit 1
-  $LSREGISTER -u "$APP"
-  open ~/Applications/KSeF.app
+  install_app local.ksef-daily-fetch.KsefWidget "$APP" ~/Applications/KSeF.app || exit 1
 else
   $LSREGISTER -u "$APP"
   echo "built $APP (not installed); run scripts/build-app.sh --install to install it into ~/Applications"
