@@ -36,6 +36,45 @@ struct SettingsActions {
 private let warsaw = TimeZone(identifier: "Europe/Warsaw")!
 private let labelWidth: CGFloat = 170
 
+func makePassphraseField(placeholder: String) -> NSSecureTextField {
+    let field = NSSecureTextField()
+    // An unlabelled secure field is taken for a login password and gets Password AutoFill; this is a key passphrase.
+    field.contentType = .newPassword
+    field.isAutomaticTextCompletionEnabled = false
+    field.placeholderString = placeholder
+    return field
+}
+
+struct PassphraseField: NSViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+
+    func makeNSView(context: Context) -> NSSecureTextField {
+        let field = makePassphraseField(placeholder: placeholder)
+        field.delegate = context.coordinator
+        return field
+    }
+
+    func updateNSView(_ field: NSSecureTextField, context: Context) {
+        context.coordinator.text = $text
+        field.placeholderString = placeholder
+        if field.stringValue != text { field.stringValue = text }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var text: Binding<String>
+
+        init(text: Binding<String>) { self.text = text }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            text.wrappedValue = field.stringValue
+        }
+    }
+}
+
 struct SettingsView: View {
     @Binding var form: SettingsForm
     let busy: Bool
@@ -52,8 +91,9 @@ struct SettingsView: View {
             row("Certyfikat (.crt)") { fileRow(name: form.certificateName, choose: actions.chooseCertificate) }
             row("Klucz prywatny (.key)") { fileRow(name: form.keyName, choose: actions.chooseKey) }
             row("Hasło klucza") {
-                SecureField(form.hasStoredCredentials ? "zapisane — wpisz, aby zmienić" : "", text: $form.password)
-                    .labelsHidden()
+                PassphraseField(
+                    text: $form.password, placeholder: form.hasStoredCredentials ? "zapisane — wpisz, aby zmienić" : ""
+                )
             }
             row("Środowisko") {
                 Picker("", selection: $form.environment) {

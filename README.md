@@ -147,6 +147,7 @@ Only the owner can verify these; the build was checked on the KSeF TEST environm
 - `Token dostępu wkrótce wygaśnie.`: the run ended early because the access token was about to expire; the next run continues.
 - A failed run appends a `BŁĄD` section to the day's report and notifies, except when it repeats the previous failed run's reason on the same Europe/Warsaw day.
 - `Uszkodzony plik ustawień`: `settings.json` was edited by hand or damaged; open **Ustawienia…**, correct the fields and press **Zapisz**.
+- A "Passwords…" popup appears under a settings field and blocks typing: press Esc and click the field again.
 
 ## Development
 
