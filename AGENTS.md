@@ -28,6 +28,13 @@ A personal macOS tool: `KSeF.app`, a native menu-bar app that every hour fetches
 - Tests never write under the real home: `run()` takes `snapshotURL` and `AppPaths(home:)` takes a temp folder.
 - Refer to the owner as "they" or "the owner".
 
+## Before handing work to the owner
+
+- Run the exact command path the owner will be told to run, end to end. When the real target is off-limits (the installed app, production KSeF), run the identical code path against a stand-in (e.g. `install_app` from `scripts/install-app.zsh` on a throwaway app with its own bundle identifier in a scratch directory) and say plainly which part was only exercised on the stand-in.
+- `scripts/build-app.sh` without arguments exits 0 on the final commit: clean build, no warnings in `widget/` sources, hardened runtime on both bundles. Read the whole output, never reduce it to pass/fail lines.
+- `.github/workflows/ci.yml` is green on the pushed commit before the owner is told to merge or install; give the run link, or say it is not green and why.
+- Say what was not verified: anything only the owner's Mac can show.
+
 ## State
 
 The app folder `~/Library/Application Support/local.ksef-daily-fetch.KsefWidget/` (folder 0700): `settings.json`, `ksef-auth.crt`, `ksef-auth.key` (0600); the key password is one generic-password item in the login Keychain. Under the invoice folder (default `~/Documents/KSeF`, unchanged formats): `identity.json` (the NIP and environment the folder belongs to; app only), `state.json` (checkpoint), `index.jsonl` (append-only, one line per saved invoice, also the dedup set), `ledger.jsonl` (append-only, one line per purchase or sales invoice of the year: metadata and amounts only) and `ledger-state.json` (checkpoint per side, `completeAt` and the `skipped` invoices the ledger could not sum), `invoices/YYYY/MM/<ksefNumber>.xml` (bytes exactly as KSeF returned them), `reports/YYYY-MM-DD.md` (a day can hold several sections). Outside both: `~/Library/Application Support/ksef-daily-fetch/widget.json` (widget snapshot, rewritten after every run).

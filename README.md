@@ -188,6 +188,8 @@ xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefE2ETests -destinatio
 xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefE2ETests -destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build test -only-testing:KsefE2ETests/SummaryProbeE2ETests
 ```
 
+Every push and pull request is built and tested by `.github/workflows/ci.yml` on a hosted macOS runner: it generates the project, runs `KsefCoreTests`, `KsefWidgetTests` and `KsefAppTests`, compiles `KsefE2ETests` without running them, and runs `scripts/build-app.sh`. It does not run the KSeF TEST E2E tests and installs nothing.
+
 `FetchE2ETests` (both sides of one invoice, income and expense) takes 4–8 minutes, and `SummaryProbeE2ETests` (a correcting and a EUR invoice, printing the metadata KSeF returns for them) about 6; TEST allows 20 metadata queries per hour, so run each at most twice an hour, and not from 27 to 31 December, when the year ledger needs one more window per side.
 
 The fixtures in `widget/CoreTests/Fixtures/` are frozen outputs of the removed TypeScript implementation (see their README); the RSA signature must stay byte-identical to `xades-rsa.json`.
