@@ -44,6 +44,7 @@ public func run(_ options: RunOptions) async -> RunSummary {
     var summary: RunSummary
     var folderChecked = false
     var ledgerCompleted = false
+    var syncLedgerAfterAnnouncing: (() async -> Bool)?
 
     do {
         let hasMarker = try checkDataFolder(dataDir, settings: settings)
@@ -87,7 +88,7 @@ public func run(_ options: RunOptions) async -> RunSummary {
         case .partial(let reason): (.partial, reason)
         }
         if outcome == .complete {
-            ledgerCompleted = await updateLedger(dataDir: dataDir, query: query, now: now, sleep: options.sleep, log: log)
+            syncLedgerAfterAnnouncing = { await updateLedger(dataDir: dataDir, query: query, now: now, sleep: options.sleep, log: log) }
         }
         summary = RunSummary(startedAt: startedAt, status: status, reason: reason, failureKey: nil, saved: saved, checked: nil)
     } catch {
@@ -100,9 +101,8 @@ public func run(_ options: RunOptions) async -> RunSummary {
 
     // A lasting failure would otherwise notify at every hourly run: stay quiet when the snapshot on disk already
     // holds the same failure from today. New invoices saved by this run are always announced.
-    let finishedAt = now()
     let repeatedFailure = summary.status == .failed && summary.saved.isEmpty
-        && isRepeatedFailure(summary.failureKey, snapshotURL: options.snapshotURL, now: finishedAt)
+        && isRepeatedFailure(summary.failureKey, snapshotURL: options.snapshotURL, now: now())
 
     if summary.status != .complete || !summary.saved.isEmpty {
         do {
@@ -115,6 +115,11 @@ public func run(_ options: RunOptions) async -> RunSummary {
             await notifyLogging(notification.title, notification.message, notify: options.notify, log: log)
         }
     }
+
+    // After the announcement: the ledger can take minutes when rate-limited, and a quit in that window must not
+    // leave saved invoices unannounced.
+    if let syncLedgerAfterAnnouncing { ledgerCompleted = await syncLedgerAfterAnnouncing() }
+    let finishedAt = now()
 
     var invoices: [WidgetInvoice] = []
     do {

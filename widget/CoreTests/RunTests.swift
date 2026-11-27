@@ -557,6 +557,26 @@ final class RunTests: XCTestCase {
         XCTAssertEqual(r.clock.sleeps.filter { $0 == 500 }.count, ledgerQueries + idleQueries)
     }
 
+    func testNewInvoicesAreAnnouncedBeforeTheLedgerSendsItsFirstQuery() async {
+        let r = rig(invoices: [fakeInvoice(1)])
+        let clock = r.clock
+        let notifications = r.notifications
+        let reportPath = reportURL(r.dataDir).path
+        let atFirstLedgerPause = Locked<[String]>([])
+        var options = r.options
+        options.sleep = { milliseconds in
+            if milliseconds == 500 {
+                let reported = FileManager.default.fileExists(atPath: reportPath)
+                atFirstLedgerPause.update { $0.append("notifications=\(notifications.value.count) report=\(reported)") }
+            }
+            clock.sleep(milliseconds)
+        }
+
+        _ = await KsefCore.run(options)
+
+        XCTAssertEqual(atFirstLedgerPause.value.first, "notifications=1 report=true")
+    }
+
     func testAPartialDownloadSkipsTheLedger() async throws {
         let invoices = [fakeInvoice(1), fakeInvoice(2)]
         let second = invoices[1].metadata.ksefNumber
