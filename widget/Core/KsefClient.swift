@@ -34,6 +34,24 @@ public struct InvoiceMetadata: Codable, Equatable, Sendable {
     var invoiceType: String?
 }
 
+extension InvoiceMetadata {
+    // The three summary fields are decoded leniently: a wrong type there must not fail the page the download uses.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        ksefNumber = try container.decode(String.self, forKey: .ksefNumber)
+        invoiceNumber = try container.decode(String.self, forKey: .invoiceNumber)
+        issueDate = try container.decode(String.self, forKey: .issueDate)
+        permanentStorageDate = try container.decode(String.self, forKey: .permanentStorageDate)
+        seller = try container.decode(Seller.self, forKey: .seller)
+        grossAmount = try container.decode(Double.self, forKey: .grossAmount)
+        currency = try container.decode(String.self, forKey: .currency)
+        invoiceHash = try container.decode(String.self, forKey: .invoiceHash)
+        netAmount = try? container.decodeIfPresent(Double.self, forKey: .netAmount)
+        vatAmount = try? container.decodeIfPresent(Double.self, forKey: .vatAmount)
+        invoiceType = try? container.decodeIfPresent(String.self, forKey: .invoiceType)
+    }
+}
+
 struct MetadataPage: Decodable, Equatable {
     let hasMore: Bool
     let isTruncated: Bool
