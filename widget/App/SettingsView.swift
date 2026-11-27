@@ -35,6 +35,7 @@ struct SettingsActions {
 private let warsaw = TimeZone(identifier: "Europe/Warsaw")!
 private let labelWidth: CGFloat = 170
 
+@MainActor
 func makePassphraseField(placeholder: String) -> NSSecureTextField {
     let field = NSSecureTextField()
     // An unlabelled secure field is taken for a login password and gets Password AutoFill; this is a key passphrase.

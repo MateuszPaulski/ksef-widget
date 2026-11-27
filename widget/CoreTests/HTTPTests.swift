@@ -145,8 +145,9 @@ final class HTTPTests: XCTestCase {
             HTTPURLResponse(url: source, statusCode: 302, httpVersion: nil, headerFields: ["Location": target.absoluteString])
         )
         let delegate = try XCTUnwrap(URLSessionTransport().sessionDelegate as? URLSessionTaskDelegate)
-        var answered = false
-        var followed: URLRequest?
+        // The delegate calls the handler synchronously, so nothing races on these.
+        nonisolated(unsafe) var answered = false
+        nonisolated(unsafe) var followed: URLRequest?
 
         delegate.urlSession?(
             session, task: session.dataTask(with: source), willPerformHTTPRedirection: response, newRequest: URLRequest(url: target)

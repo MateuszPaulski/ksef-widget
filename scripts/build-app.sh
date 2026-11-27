@@ -34,8 +34,19 @@ check_hardened() {
 
 xcodegen generate --spec widget/project.yml --project widget || exit 1
 # Clean: an incremental build can keep a stale, unhardened extension inside the app.
+BUILD_LOG=$(mktemp -t ksef-build) || exit 1
 xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefWidget -configuration Release \
-  -destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build -quiet clean build || exit 1
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build -quiet clean build > $BUILD_LOG 2>&1
+BUILD_STATUS=$?
+cat $BUILD_LOG
+if (( BUILD_STATUS != 0 )); then rm -f $BUILD_LOG; exit 1; fi
+# Our own sources must compile without warnings (SDK notes elsewhere are not ours to fix).
+if grep -qE "^$REPO/widget/[^ ]*: warning:" $BUILD_LOG; then
+  echo "error: the build has warnings in widget/ sources (listed above)" >&2
+  rm -f $BUILD_LOG
+  exit 1
+fi
+rm -f $BUILD_LOG
 
 if [[ -n $IDENTITY ]]; then
   codesign --force --sign "$IDENTITY" --options runtime --entitlements widget/Extension/Extension.entitlements "$EXTENSION" || exit 1
