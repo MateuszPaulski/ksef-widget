@@ -60,13 +60,13 @@ Sources: the TEST OpenAPI (`https://api-test.ksef.mf.gov.pl/docs/v2/openapi.json
 
 ### 5.2 Correcting, advance and settlement invoices
 
-- FA(3) `P_13_x` (net per rate): "W przypadku faktur korygujących - kwota różnicy, o której mowa w art. 106j ust. 2 pkt 5 ustawy"; `P_15`: "W przypadku faktur korygujących - korekta kwoty wynikającej z faktury korygowanej" (XSD). The changelog of API 2.3.0 allowed negative values in the `amount` filter ("Umożliwiono wyszukiwanie faktur po ujemnych kwotach"). Together: a correction that lowers a sale carries negative amounts. **UNCONFIRMED** that metadata `netAmount` of a `Kor` is the signed sum of its `P_13_x`; the docs never say how `netAmount` is derived. The plan's TEST probe (Task 8) sends a `KOR` with negative amounts and checks the metadata.
+- FA(3) `P_13_x` (net per rate): "W przypadku faktur korygujących - kwota różnicy, o której mowa w art. 106j ust. 2 pkt 5 ustawy"; `P_15`: "W przypadku faktur korygujących - korekta kwoty wynikającej z faktury korygowanej" (XSD). The changelog of API 2.3.0 allowed negative values in the `amount` filter ("Umożliwiono wyszukiwanie faktur po ujemnych kwotach"). Together: a correction that lowers a sale carries negative amounts. Confirmed on TEST 2026-11-27 (FA(3) only; nothing is claimed about PROD): the metadata of a `KOR` with `P_13_1` -43.60, `P_14_1` -10.03 and `P_15` -53.63 came back as `invoiceType` `Kor`, `netAmount` -43.6, `grossAmount` -53.63, `vatAmount` -10.03, so all three amounts carry the sign of the invoice. The docs still never say how `netAmount` is derived.
 - `Zal` (advance): `P_13_x` "W przypadku faktur zaliczkowych - wartość zaliczki netto" (XSD). `Roz` (settlement after advances, art. 106f ust. 3): the XSD says only that `P_15` holds "kwota pozostała do zapłaty"; it says nothing special for `P_13_x`. If issuers put only the remainder in `P_13_x` of a `Roz`, `Zal` + `Roz` add up to the sale; if they put the full value, the sale counts twice. **UNCONFIRMED**; it depends on the issuer. The summary counts every invoice type; the ledger keeps `invoiceType`, so a later rule (for example excluding `Zal`) needs no refetch.
 - `Upr` (simplified invoice) may lack `P_13_x`; what `netAmount` then holds is **UNCONFIRMED** (small amounts by definition, at most 450 PLN).
 
 ### 5.3 Currency
 
-`currency` is the invoice's `KodWaluty`. **UNCONFIRMED but strongly indicated**: `netAmount` and `grossAmount` are in the invoice currency (only `vatAmount` is described as PLN, and FA(3) keeps foreign-currency VAT in PLN in separate `P_14_xW` fields). The summary uses only `netAmount` with `currency`. The TEST probe (Task 8) sends a EUR invoice and prints its metadata.
+`currency` is the invoice's `KodWaluty`. Confirmed on TEST 2026-11-27 (nothing is claimed about PROD): a `Vat` invoice with `KodWaluty` EUR, `P_13_1` 100.00, `P_14_1` 23.00, `P_14_1W` 98.42 and `P_15` 123.00 came back as `currency` `EUR`, `netAmount` 100, `grossAmount` 123, `vatAmount` 98.42, so net and gross are in the invoice currency and `vatAmount` is the PLN value of the VAT (`P_14_1W`). The summary uses only `netAmount` with `currency`.
 
 ### 5.4 The app today
 
@@ -150,7 +150,7 @@ In their main checkout: `config.json`, `node_modules/`, and `data/` only after c
 
 ## 8. Risks and open points
 
-- Correction sign, foreign-currency net and `vatAmount` in PLN are UNCONFIRMED (5.2, 5.3); the TEST probe settles the first two for FA(3). A wrong sign would show as a summary too high by twice the correction; the owner can compare with their bookkeeping.
+- Correction sign, foreign-currency net and `vatAmount` in PLN were confirmed on TEST on 2026-11-27 for FA(3) (5.2, 5.3); production behaviour is not verified and the owner can compare the totals with their bookkeeping.
 - `Zal` + `Roz` double counting depends on the issuer (5.2); `Upr` net may be zero (5.2).
 - An idle run now spends 3 metadata queries instead of 1; manual presses spend 3 each (7.3).
 - `completeAt` lags by at most the run interval; the "stan na" suffix appears whenever a run does not complete the ledger, including runs whose download was partial (cap, token), until the next complete run.

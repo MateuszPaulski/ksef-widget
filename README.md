@@ -6,9 +6,18 @@ The owner is a Polish sole proprietor whose purchase invoices now arrive through
 
 After a run that found something, the owner gets one macOS notification, for example `KSeF: 2 nowe faktury` with a body like `Acme Sp. z o.o.: 1230,00 PLN; Beta S.A.: 53,63 EUR`, and a section appended to `reports/YYYY-MM-DD.md` in the invoice folder: for each invoice the seller, NIP, invoice number, gross amount with currency, issue date, a link to view it in KSeF and the KSeF number. A run with nothing new is silent. A partial or failed run notifies with the reason and appends it to the day's report; a failure that repeats the previous run's failure on the same day notifies only once, but the report and the widget still show it, so a failure is never silent. The one thing the app cannot do is announce that it is not running: then only the widget's stale banner shows it.
 
+The widget also shows a one-line summary of the current year at the bottom: net expenses (purchase invoices) and net incomes (sales invoices). To get it, the app also reads the metadata of the owner's sales invoices from KSeF every hour and keeps a ledger of the current year in the invoice folder; sales invoices are never downloaded, notified or reported, and no XML of theirs is saved. What the summary covers, and what it does not:
+
+- Only invoices that are present in KSeF: an invoice issued outside KSeF, or before KSeF applied, is not in it.
+- Net amounts, by issue date, for the current calendar year in Europe/Warsaw time. Gross amounts and VAT are not summed.
+- PLN is always shown; every other currency is listed separately (`+ <kwota> EUR`) and never converted. A currency whose sum is zero is not listed.
+- Correcting invoices count with the sign KSeF reports for them.
+- Advance and settlement invoices may count twice, if the issuer entered the full value on both; KSeF's documentation does not say how it fills the net amount for them, so compare the totals with the owner's own books.
+- The first run after the update reads the year from 1 January, so until it completes the line shows `podsumowanie w przygotowaniu`. `stan na …` means the last refresh did not complete (see Desktop widget).
+
 Everything is set up in a settings window, with no terminal, no Node and no `config.json`.
 
-Design: `docs/superpowers/specs/2026-11-26-ksef-swift-app-design.md` (the app), `docs/superpowers/specs/2026-11-26-ksef-daily-fetch-design.md` (the fetcher rules the app ports) and `docs/superpowers/specs/2026-11-26-ksef-desktop-widget-design.md` (the widget); decisions: `ADR.md`.
+Design: `docs/superpowers/specs/2026-11-26-ksef-swift-app-design.md` (the app), `docs/superpowers/specs/2026-11-26-ksef-daily-fetch-design.md` (the fetcher rules the app ports), `docs/superpowers/specs/2026-11-26-ksef-desktop-widget-design.md` (the widget) and `docs/superpowers/specs/2026-11-27-ksef-year-summary-and-fallback-removal-design.md` (the year summary); decisions: `ADR.md`.
 
 ## Requirements
 
@@ -67,7 +76,7 @@ Where things live (the widget can read only the snapshot, the last item):
 
 - `~/Library/Application Support/local.ksef-daily-fetch.KsefWidget/`, folder mode 0700: `settings.json`, `ksef-auth.crt` and `ksef-auth.key` (still encrypted), mode 0600.
 - Login Keychain: one item, service `local.ksef-daily-fetch.KsefWidget`, account `key-password`, label `KSeF — hasło klucza prywatnego`.
-- The invoice folder: `state.json` (checkpoint), `index.jsonl` (one line per saved invoice, also the dedup set), `invoices/YYYY/MM/<ksefNumber>.xml` and `reports/YYYY-MM-DD.md`. The app adds `identity.json` (`{"nip", "environment"}`): a folder belongs to one NIP and environment, and a run or a check against another is refused with `Folder faktur zawiera dane innego podatnika lub środowiska`; a folder without the file (new, or written by an earlier version) is adopted.
+- The invoice folder: `state.json` (checkpoint), `index.jsonl` (one line per saved invoice, also the dedup set), `invoices/YYYY/MM/<ksefNumber>.xml` and `reports/YYYY-MM-DD.md`, plus the year summary's two files: `ledger.jsonl` (append-only, one line per purchase or sales invoice of the year with its KSeF number, side, issue date, type, currency and net, gross and VAT amounts) and `ledger-state.json` (the checkpoint of each side and the time of the last complete refresh). The app adds `identity.json` (`{"nip", "environment"}`): a folder belongs to one NIP and environment, and a run or a check against another is refused with `Folder faktur zawiera dane innego podatnika lub środowiska`; a folder without the file (new, or written by an earlier version) is adopted.
 - `~/Library/Application Support/ksef-daily-fetch/widget.json`: the widget snapshot, rewritten after every run.
 
 ## Running
@@ -77,6 +86,8 @@ The app fetches when the last run is an hour or more old. A background tick ever
 Notification rules: nothing for a quiet complete run, one per run for new invoices (`KSeF: 2 nowe faktury`), partial or failed; a failed run with the same failure as the previous failed run on the same Europe/Warsaw day (a KSeF API error counts by its HTTP status alone, any other error by its message) does not notify again, so a lasting failure notifies once a day, not every hour. A problem that stops a run before it starts (damaged settings, unreadable credential files, missing Keychain item) is reported the same way and also writes a failed snapshot.
 
 KSeF allows 64 single-invoice downloads per hour, so the app never saves more than 60 invoices in any rolling hour, counting earlier runs too (from `savedAt` in `index.jsonl`). A large backfill that ends with a message ending in `pobrań na godzinę.` simply continues at the next hourly run.
+
+KSeF also allows 20 metadata queries per hour. An idle hourly run uses 3 of them (one for the purchase download, one for each side of the year summary), the first run after the update up to 11, and each **Pobierz teraz** 3. Reaching the limit stops only the summary update, which continues at the next hourly run; the download always runs first and its outcome never depends on the summary.
 
 Logs go to the unified log; run lines look like `run finished trigger=… status=… saved=…`:
 
@@ -88,13 +99,22 @@ Logs go to the unified log; run lines look like `run finished trigger=… status
 
 ## Desktop widget
 
-A medium or large widget on the desktop lists the newest saved invoices (seller, gross amount, issue date) under `KSeF · zaktualizowano HH:mm`, with `N nowe dziś` for the invoices saved today. It reads only `~/Library/Application Support/ksef-daily-fetch/widget.json`, which every run writes; it never talks to KSeF, has no network access and can read nothing else. One banner can appear above the list:
+A medium or large widget on the desktop lists the newest saved invoices (seller, gross amount, issue date) under `KSeF · zaktualizowano HH:mm`, with `N nowe dziś` for the invoices saved today, and the year summary as a line at the bottom. It reads only `~/Library/Application Support/ksef-daily-fetch/widget.json`, which every run writes; it never talks to KSeF, has no network access and can read nothing else. One banner can appear above the list:
 
 - `Brak danych`: no snapshot yet (nothing has been fetched since the widget was set up).
 - `Nie można odczytać danych widżetu`: the snapshot cannot be read or decoded.
 - `Dane nieaktualne — ostatnia aktualizacja`: the snapshot is three hours old or older, for example the Mac was off or the app is not running.
 - `Błąd pobierania`: the last run failed.
 - `Pobrano częściowo`: the last run was partial.
+
+The year summary line is one of four, in the widget's secondary colour (orange when it is a warning):
+
+- `2026 · wydatki 1230,00 PLN · przychody 0,00 PLN`: both sides are up to date as of the last run. Amounts of 10 000 and more are grouped with a non-breaking space.
+- `2026 (stan na 26.11 11:00) · wydatki … · przychody …`: orange; the last run did not complete the refresh (a limit, a failure, or a partial download), so the totals are as of the time shown, in Warsaw time, and the next complete run clears it.
+- `2026 · podsumowanie w przygotowaniu`: orange; the ledger has not yet completed once, for example right after the update, so no total is shown.
+- `2026 · podsumowanie niedostępne: …`: orange; a ledger file cannot be read, with the reason (see Troubleshooting).
+
+With the summary the medium widget shows two invoice rows instead of three (one under a banner); the large widget keeps eight. After a setup failure (no settings, unreadable credential files, missing Keychain item) there is no summary line until the next run.
 
 The widget is part of `KSeF.app`, so installing the app installs it. Right-click the desktop, choose **Edit Widgets…**, search for "KSeF" and add the medium or large size (menu names may differ slightly). After every run the app asks the widget to refresh; otherwise macOS refreshes it about every 30 minutes. Clicking an invoice opens its KSeF page in the browser through the app, which keeps running.
 
@@ -122,22 +142,20 @@ rm -f ~/Library/Logs/ksef-daily-fetch.log
 ls ~/Library/LaunchAgents | grep ksef   # expected: nothing (no LaunchAgent was installed)
 ```
 
-## First-run checklist
+## After updating to the year summary
 
-Only the owner can verify these; the build was checked on the KSeF TEST environment and offline (see Development), never against production, with the real Keychain, with notifications or in the real widget host.
+The year summary and the removal of the TypeScript fetcher are installed by building again after merging: `scripts/build-app.sh --install`. Only the owner can verify these; the build was checked offline and on the KSeF TEST environment (see Development), never against production, in the real widget host or with real invoices.
 
-1. Build and install (`scripts/build-app.sh --install`, with or without an identity): the app appears in the menu bar and opens its settings window.
-2. Pick the real `.crt` and `.key`, type the password, NIP, environment `Produkcja`, start date, keep or change the folder, press **Zapisz**: the Keychain item is created; macOS may ask for Documents access and notification permission. Also check that copy and paste work in the password field.
-3. **Wyślij testowe powiadomienie**: the banner appears.
-4. **Sprawdź połączenie**: the first production login with the Swift signer; expected `Połączenie działa. …`. On failure, send the exact message to the developer (the issuer string of the MF CA is the one thing the TEST environment could not exercise).
-5. Turn on **Uruchamiaj przy logowaniu**; approve in System Settings if asked; log out and in once.
-6. Add the widget; after the first run it shows data; click a row: the browser opens the KSeF page and the app keeps running.
-7. After a day: hourly `run finished` lines in the log (command above), including one after a sleep.
-8. After one rebuild: note which prompts reappeared (Keychain, Documents, login item, notifications), ad hoc or Developer ID.
-9. Report the key's algorithm OIDs (`openssl asn1parse -in <key> | grep OBJECT`) and the certificate's issuer line (`/usr/bin/openssl x509 -in <crt> -noout -issuer -nameopt RFC2253,utf8,-esc_msb`).
+1. The footer appears in the real medium and large widget after the first run, in light and dark appearance; the medium widget shows two rows.
+2. The first run after the update completes the ledger (the line has no `stan na`); `ledger.jsonl` and `ledger-state.json` appear in the invoice folder, and the files that were there before are untouched. That run reads the year from 1 January, so it uses up to 11 metadata queries.
+3. Expenses and incomes match the owner's own records for the year (net, by issue date), including any correction, advance or settlement invoice and foreign-currency invoice.
+4. After a run that hits a limit or fails, the line shows `(stan na …)` in orange and clears at the next complete run.
+5. On 1 January the line switches to the new year at the first run.
+6. Delete the leftovers of the old setup that are no longer needed (Leftovers of the old setup, above).
 
 ## Troubleshooting
 
+- `podsumowanie niedostępne: Uszkodzony plik ledger.jsonl, linia N`: that line of `ledger.jsonl` is damaged (for example a torn last line). Delete that line; or delete both `ledger.jsonl` and `ledger-state.json` and the next run rebuilds them from 1 January (up to 11 metadata queries). `Uszkodzony plik ledger-state.json` is handled the same way.
 - A corrupt line in `index.jsonl` fails the run loudly (`Uszkodzony plik index.jsonl, linia N`). The XML stays on disk; delete or fix that line and the next run downloads the invoice again.
 - `Token dostępu wkrótce wygaśnie.`: the run ended early because the access token was about to expire; the next run continues.
 - A failed run appends a `BŁĄD` section to the day's report and notifies, except when it repeats the previous failed run's reason on the same Europe/Warsaw day.
@@ -159,9 +177,10 @@ mkdir -p widget/build/renders && TEST_RUNNER_SETTINGS_RENDER_DIR="$PWD/widget/bu
 # against KSeF TEST only (network; not 16:00-18:00 Warsaw time, the TEST maintenance window)
 xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefE2ETests -destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build test -only-testing:KsefE2ETests/AuthE2ETests
 xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefE2ETests -destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build test -only-testing:KsefE2ETests/FetchE2ETests
+xcodebuild -project widget/KsefWidget.xcodeproj -scheme KsefE2ETests -destination 'platform=macOS,arch=arm64' -derivedDataPath widget/build test -only-testing:KsefE2ETests/SummaryProbeE2ETests
 ```
 
-`FetchE2ETests` takes 4–8 minutes, and TEST allows 20 metadata queries per hour, so run it at most twice an hour.
+`FetchE2ETests` (both sides of one invoice, income and expense) takes 4–8 minutes, and `SummaryProbeE2ETests` (a correcting and a EUR invoice, printing the metadata KSeF returns for them) about 6; TEST allows 20 metadata queries per hour, so run each at most twice an hour, and not from 27 to 31 December, when the year ledger needs one more window per side.
 
 The fixtures in `widget/CoreTests/Fixtures/` are frozen outputs of the removed TypeScript implementation (see their README); the RSA signature must stay byte-identical to `xades-rsa.json`.
 
