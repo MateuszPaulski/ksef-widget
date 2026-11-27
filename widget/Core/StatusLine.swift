@@ -18,14 +18,13 @@ public func readSnapshotStatus(_ url: URL) -> SnapshotStatus? {
 }
 
 public enum MenuState: Equatable, Sendable {
-    case running, legacyAgent, notConfigured, notVerified
+    case running, notConfigured, notVerified
     case idle(SnapshotStatus?)
 }
 
 public func menuStatusLine(_ state: MenuState) -> String {
     switch state {
     case .running: "Pobieranie w toku…"
-    case .legacyAgent: "Wstrzymane: zainstalowane jest stare zadanie launchd"
     case .notConfigured: "Nie skonfigurowano — otwórz Ustawienia…"
     case .notVerified: "Sprawdź połączenie w Ustawieniach, aby zacząć pobieranie"
     case .idle(nil): "Jeszcze nie pobierano"

@@ -35,9 +35,3 @@ public final class RunGate {
         return true
     }
 }
-
-public enum LegacyLaunchAgent {
-    public static func isInstalled(_ paths: AppPaths) -> Bool {
-        FileManager.default.fileExists(atPath: paths.legacyLaunchAgent.path)
-    }
-}

@@ -7,7 +7,6 @@ public struct AppPaths: Sendable {
     public let key: URL
     public let snapshot: URL
     public let defaultDataDir: URL
-    let legacyLaunchAgent: URL
 
     init(home: URL) {
         let support = home.appendingPathComponent("Library/Application Support", isDirectory: true)
@@ -17,7 +16,6 @@ public struct AppPaths: Sendable {
         key = appFolder.appendingPathComponent("ksef-auth.key")
         snapshot = support.appendingPathComponent("ksef-daily-fetch/widget.json")
         defaultDataDir = home.appendingPathComponent("Documents/KSeF", isDirectory: true)
-        legacyLaunchAgent = home.appendingPathComponent("Library/LaunchAgents/local.ksef-daily-fetch.plist")
     }
 
     /// The app is not sandboxed, so this is the real home folder.

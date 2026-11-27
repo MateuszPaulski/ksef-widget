@@ -14,9 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let state = model.settingsState
         let configured = state.isConfigured
         let verified = state.settings?.verified ?? false
-        logger.notice(
-            "launch configured=\(configured) verified=\(verified) legacyAgent=\(LegacyLaunchAgent.isInstalled(self.model.paths))"
-        )
+        logger.notice("launch configured=\(configured) verified=\(verified)")
 
         let settingsWindow = SettingsWindowController(
             app: model, didChange: { [weak self] in self?.statusMenu?.refreshIcon() }, didVerify: { [weak self] in self?.tick("verified") }
@@ -110,12 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         default: break
         }
         let lastRunAt = RunSchedule.lastRunAt(snapshot: model.paths.snapshot, lastRunEnd: model.lastRunEnd)
-        let due = RunSchedule.isDue(lastRunAt: lastRunAt, now: Date())
-        if LegacyLaunchAgent.isInstalled(model.paths) {
-            if due { logger.notice("tick trigger=\(trigger, privacy: .public) due=true blocked=legacyAgent") }
-            return
-        }
-        guard due else { return }
+        guard RunSchedule.isDue(lastRunAt: lastRunAt, now: Date()) else { return }
         logger.notice("tick trigger=\(trigger, privacy: .public) due=true")
         fetch(trigger)
     }
@@ -140,7 +133,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func menuContent() -> MenuContent {
         let state = model.settingsState
-        let legacy = LegacyLaunchAgent.isInstalled(model.paths)
         let snapshot = readSnapshotStatus(model.paths.snapshot)
         let menuState: MenuState
         var canFetch = false
@@ -151,16 +143,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menuState = .idle(snapshot)
         case .ready(let settings):
             menuState = settings.verified ? .idle(snapshot) : .notVerified
-            canFetch = settings.verified && !legacy && !model.gate.isRunning
+            canFetch = settings.verified && !model.gate.isRunning
         }
-        let displayed: MenuState = model.gate.isRunning ? .running : legacy ? .legacyAgent : menuState
+        let displayed: MenuState = model.gate.isRunning ? .running : menuState
         let configured = state.isConfigured
         return MenuContent(
             statusLine: menuStatusLine(displayed),
             showsNotificationWarning: configured && model.notificationsAllowed == false,
             configured: configured,
             canFetch: canFetch,
-            showsWarningIcon: legacy || snapshot?.status == .failed
+            showsWarningIcon: snapshot?.status == .failed
         )
     }
 }

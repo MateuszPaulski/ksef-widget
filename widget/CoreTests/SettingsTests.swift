@@ -140,6 +140,5 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(paths.key.path, "\(appFolder)/ksef-auth.key")
         XCTAssertEqual(paths.snapshot.path, "/tmp/home/Library/Application Support/ksef-daily-fetch/widget.json")
         XCTAssertEqual(paths.defaultDataDir.path, "/tmp/home/Documents/KSeF")
-        XCTAssertEqual(paths.legacyLaunchAgent.path, "/tmp/home/Library/LaunchAgents/local.ksef-daily-fetch.plist")
     }
 }

@@ -13,12 +13,12 @@ final class SettingsRenderTests: XCTestCase {
 
     private func form(
         nip: String = "", dataDir: String = "~/Documents/KSeF", stored: Bool = false, startAtLogin: Bool = false,
-        needsApproval: Bool = false, notifications: Bool? = nil, legacyAgent: Bool = false, message: SettingsMessage? = nil
+        needsApproval: Bool = false, notifications: Bool? = nil, message: SettingsMessage? = nil
     ) -> SettingsForm {
         SettingsForm(
             nip: nip, environment: .prod, startDate: startDate(fromText: "2026-02-01")!, dataDir: dataDir,
             certificateName: nil, keyName: nil, password: "", hasStoredCredentials: stored, startAtLogin: startAtLogin,
-            loginNeedsApproval: needsApproval, notificationsAllowed: notifications, legacyAgent: legacyAgent, message: message
+            loginNeedsApproval: needsApproval, notificationsAllowed: notifications, message: message
         )
     }
 
@@ -38,12 +38,6 @@ final class SettingsRenderTests: XCTestCase {
                 message: SettingsMessage(text: "Błąd: " + reason, isError: true)
             ),
             name: "settings-error"
-        )
-    }
-
-    func testRenderLegacyAgent() throws {
-        try render(
-            form(nip: "5265877635", stored: true, notifications: false, legacyAgent: true), name: "settings-legacy-agent"
         )
     }
 

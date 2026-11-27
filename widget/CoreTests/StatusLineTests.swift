@@ -11,7 +11,6 @@ final class StatusLineTests: XCTestCase {
 
     func testFixedLines() {
         XCTAssertEqual(menuStatusLine(.running), "Pobieranie w toku…")
-        XCTAssertEqual(menuStatusLine(.legacyAgent), "Wstrzymane: zainstalowane jest stare zadanie launchd")
         XCTAssertEqual(menuStatusLine(.notConfigured), "Nie skonfigurowano — otwórz Ustawienia…")
         XCTAssertEqual(menuStatusLine(.notVerified), "Sprawdź połączenie w Ustawieniach, aby zacząć pobieranie")
         XCTAssertEqual(menuStatusLine(.idle(nil)), "Jeszcze nie pobierano")

@@ -100,8 +100,7 @@ final class SettingsWindowController {
             dataDir: settings?.dataDir ?? app.paths.defaultDataDir.path, certificateName: nil, keyName: nil, password: "",
             hasStoredCredentials: storedCredentialsExist(), startAtLogin: loginStatus == .enabled,
             loginNeedsApproval: loginStatus == .requiresApproval,
-            notificationsAllowed: settings == nil ? nil : app.notificationsAllowed,
-            legacyAgent: LegacyLaunchAgent.isInstalled(app.paths), message: message
+            notificationsAllowed: settings == nil ? nil : app.notificationsAllowed, message: message
         )
     }
 

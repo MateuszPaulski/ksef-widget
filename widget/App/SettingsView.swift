@@ -18,7 +18,6 @@ struct SettingsForm: Equatable {
     var startAtLogin: Bool
     var loginNeedsApproval: Bool
     var notificationsAllowed: Bool?
-    var legacyAgent: Bool
     var message: SettingsMessage?
 }
 
@@ -82,7 +81,6 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if form.legacyAgent { legacyBanner }
             row("NIP") {
                 TextField("", text: $form.nip)
                     .labelsHidden()
@@ -177,15 +175,6 @@ struct SettingsView: View {
 
     /// The latest start date `Settings.validate` accepts: the current UTC day.
     private var latestStartDate: Date { startDate(fromText: defaultStartDateText(now: Date())) ?? Date() }
-
-    private var legacyBanner: some View {
-        Text("Wykryto stare zadanie launchd „local.ksef-daily-fetch”. Dopóki jest zainstalowane, aplikacja nie pobiera faktur. Usuń je w Terminalu poleceniem scripts/launchagent.sh uninstall w katalogu repozytorium.")
-            .foregroundStyle(Color.red)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-    }
 
     private func row<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
