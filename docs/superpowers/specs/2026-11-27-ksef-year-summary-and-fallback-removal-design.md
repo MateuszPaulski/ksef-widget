@@ -123,7 +123,7 @@ One incremental metadata sync per subject, on the same window, paging and checkp
 
 ### 7.4 Money
 - (S) Amounts are decoded from JSON as `Double` (as `grossAmount` is today), then converted once to integer grosze (`Int64`) by `(amount × 100).rounded()`; a value more than 0.001 grosz away from a whole number of grosze, not finite, or at least 10¹³ PLN in magnitude is rejected (7.2). For any value with at most two decimals below that bound this conversion is exact. Sums are `Int64` grosze per currency.
-- (S) Formatting reuses `formatAmount(Double(grosze) / 100, currency)`, so the summary looks exactly like invoice rows (`48 210,55 PLN`, U+00A0 grouping from 10 000, `1230,00 PLN` below). A side is `<PLN total> PLN` (always, `0,00 PLN` when empty), then ` + <sum> <CODE>` for every other currency with a non-zero sum, codes in ascending order.
+- (S) Formatting reuses `formatAmount(Double(grosze) / 100, currency)`, so the summary looks exactly like invoice rows (`48 210,55 PLN`, U+00A0 grouping from 10 000, `1230,00 PLN` below). So an amount below 10 000 is not grouped: the approved example's `+ 1 200,00 EUR` is written `+ 1200,00 EUR`, as invoice rows already write `1230,00 PLN`. A side is `<PLN total> PLN` (always, `0,00 PLN` when empty), then ` + <sum> <CODE>` for every other currency with a non-zero sum, codes in ascending order.
 
 ### 7.5 Summary and snapshot
 - (S) Computed at the end of every run whose identity check passed, from `ledger.jsonl` and `ledger-state.json` on disk, for the Warsaw year of the run end: expenses = `Subject2` lines, incomes = `Subject1` lines, both filtered by `issueDate` starting with `<year>-`, summing `netAmount`.
