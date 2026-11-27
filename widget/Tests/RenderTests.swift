@@ -34,6 +34,49 @@ final class RenderTests: XCTestCase {
         try render(Fixtures.snapshot(), isLarge: false, name: "medium-stale", now: Fixtures.updatedAt.addingTimeInterval(5 * 3600))
     }
 
+    func testRenderMediumSummary() throws {
+        try render(Fixtures.snapshot(yearSummary: Self.plainSummary), isLarge: false, name: "medium-summary")
+    }
+
+    func testRenderMediumSummaryDark() throws {
+        try render(Fixtures.snapshot(yearSummary: Self.plainSummary), isLarge: false, name: "medium-summary-dark", dark: true)
+    }
+
+    func testRenderLargeSummary() throws {
+        try render(Fixtures.snapshot(invoiceCount: 8, yearSummary: Self.plainSummary), isLarge: true, name: "large-summary")
+    }
+
+    func testRenderLargeSummaryDark() throws {
+        try render(Fixtures.snapshot(invoiceCount: 8, yearSummary: Self.plainSummary), isLarge: true, name: "large-summary-dark", dark: true)
+    }
+
+    func testRenderMediumSummaryStale() throws {
+        let summary = Snapshot.YearSummary(
+            text: "2026 (stan na 26.11 11:00) · wydatki 48\u{a0}210,55 PLN · przychody 182\u{a0}400,00 PLN", warning: true)
+        try render(Fixtures.snapshot(yearSummary: summary), isLarge: false, name: "medium-summary-stale")
+    }
+
+    func testRenderMediumSummaryCurrency() throws {
+        let summary = Snapshot.YearSummary(
+            text: "2026 (stan na 26.11 11:00) · wydatki 1\u{a0}234\u{a0}567,89 PLN + 12\u{a0}345,67 EUR"
+                + " · przychody 2\u{a0}345\u{a0}678,90 PLN + 1200,00 USD",
+            warning: true)
+        try render(Fixtures.snapshot(yearSummary: summary), isLarge: false, name: "medium-summary-currency")
+    }
+
+    func testRenderMediumSummaryFailed() throws {
+        let reason = "Uwierzytelnienie w KSeF nieudane (kod 460: Uwierzytelnianie zakończone niepowodzeniem z powodu błędu certyfikatu — Certyfikat odwołany)"
+        try render(Fixtures.snapshot(status: .failed, reason: reason, yearSummary: Self.plainSummary), isLarge: false, name: "medium-summary-failed")
+    }
+
+    func testRenderMediumSummaryPending() throws {
+        let summary = Snapshot.YearSummary(text: "2026 · podsumowanie w przygotowaniu", warning: true)
+        try render(Fixtures.snapshot(yearSummary: summary), isLarge: false, name: "medium-summary-pending")
+    }
+
+    private static let plainSummary = Snapshot.YearSummary(
+        text: "2026 · wydatki 48\u{a0}210,55 PLN · przychody 182\u{a0}400,00 PLN", warning: false)
+
     private func render(_ snapshot: Snapshot, isLarge: Bool, name: String, dark: Bool = false, now: Date = Fixtures.now) throws {
         guard let directory = ProcessInfo.processInfo.environment["WIDGET_RENDER_DIR"] else {
             throw XCTSkip("set TEST_RUNNER_WIDGET_RENDER_DIR to render PNGs")

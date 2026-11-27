@@ -117,6 +117,29 @@ final class WidgetModelTests: XCTestCase {
         XCTAssertEqual(make(Fixtures.snapshot(status: .partial)).rowLimit(isLarge: false), 2)
     }
 
+    func testFooterCopiesTheSummary() {
+        let text = "2026 (stan na 26.11 11:00) · wydatki 43,60 PLN · przychody 0,00 PLN"
+        let summary = Snapshot.YearSummary(text: text, warning: true)
+        let footer = WidgetModel.Footer(text: text, warning: true)
+        XCTAssertEqual(make(Fixtures.snapshot(yearSummary: summary)).footer, footer)
+        XCTAssertEqual(make(Fixtures.snapshot(status: .failed, reason: "x", yearSummary: summary)).footer, footer)
+        let stale = make(Fixtures.snapshot(yearSummary: summary), now: Fixtures.updatedAt.addingTimeInterval(4 * 3600))
+        XCTAssertEqual(stale.footer, footer)
+        XCTAssertNil(WidgetModel.make(.failure(.missing), now: now).footer)
+    }
+
+    func testRowLimitWithAFooter() {
+        let summary = Snapshot.YearSummary(text: "2026 · wydatki 0,00 PLN · przychody 0,00 PLN", warning: false)
+        XCTAssertEqual(make(Fixtures.snapshot(yearSummary: summary)).rowLimit(isLarge: false), 2)
+        XCTAssertEqual(make(Fixtures.snapshot(status: .partial, yearSummary: summary)).rowLimit(isLarge: false), 1)
+        XCTAssertEqual(make(Fixtures.snapshot(yearSummary: summary)).rowLimit(isLarge: true), 8)
+    }
+
+    func testHostileFooterStaysVerbatim() {
+        let summary = Snapshot.YearSummary(text: "**x** [y](https://e.example)", warning: false)
+        XCTAssertEqual(make(Fixtures.snapshot(yearSummary: summary)).footer?.text, "**x** [y](https://e.example)")
+    }
+
     func testTimelineDates() {
         let stale = Fixtures.updatedAt.addingTimeInterval(WidgetModel.staleAfter)
         XCTAssertEqual(WidgetModel.timelineDates(.success(Fixtures.snapshot()), now: now), [now, stale, Fixtures.midnight])

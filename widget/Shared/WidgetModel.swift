@@ -16,16 +16,22 @@ struct WidgetModel: Equatable {
         let url: URL?
     }
 
+    struct Footer: Equatable {
+        let text: String
+        let warning: Bool
+    }
+
     let title: String
     let newToday: String?
     let banner: Banner?
     let rows: [Row]
     let emptyText: String?
+    let footer: Footer?
 
     static let staleAfter: TimeInterval = 3 * 3600
 
     func rowLimit(isLarge: Bool) -> Int {
-        isLarge ? 8 : (banner == nil ? 3 : 2)
+        isLarge ? 8 : 3 - (banner == nil ? 0 : 1) - (footer == nil ? 0 : 1)
     }
 
     static func make(_ result: Result<Snapshot, SnapshotLoadError>, now: Date) -> WidgetModel {
@@ -36,7 +42,7 @@ struct WidgetModel: Equatable {
             case .missing: text = "Brak danych — pobieranie jeszcze nie zapisało stanu widżetu."
             case .unreadable(let message): text = "Nie można odczytać danych widżetu: \(message)"
             }
-            return WidgetModel(title: "KSeF", newToday: nil, banner: Banner(text: text, tone: .error), rows: [], emptyText: nil)
+            return WidgetModel(title: "KSeF", newToday: nil, banner: Banner(text: text, tone: .error), rows: [], emptyText: nil, footer: nil)
 
         case .success(let snapshot):
             let updated = warsaw.dateComponents([.day, .month, .hour, .minute], from: snapshot.updatedAt)
@@ -56,7 +62,8 @@ struct WidgetModel: Equatable {
                 newToday: snapshot.savedToday > 0 && snapshot.today == warsawDay(now) ? newTodayLabel(snapshot.savedToday) : nil,
                 banner: banner,
                 rows: snapshot.invoices.map(row),
-                emptyText: snapshot.invoices.isEmpty && snapshot.status != .failed ? "Brak zapisanych faktur." : nil
+                emptyText: snapshot.invoices.isEmpty && snapshot.status != .failed ? "Brak zapisanych faktur." : nil,
+                footer: snapshot.yearSummary.map { Footer(text: $0.text, warning: $0.warning) }
             )
         }
     }
