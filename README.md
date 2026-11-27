@@ -87,7 +87,7 @@ Notification rules: nothing for a quiet complete run, one per run for new invoic
 
 KSeF allows 64 single-invoice downloads per hour, so the app never saves more than 60 invoices in any rolling hour, counting earlier runs too (from `savedAt` in `index.jsonl`). A large backfill that ends with a message ending in `pobrań na godzinę.` simply continues at the next hourly run.
 
-KSeF also allows 20 metadata queries per hour. An idle hourly run uses 3 of them (one for the purchase download, one for each side of the year summary), the first run after the update up to 11, and each **Pobierz teraz** 3. Reaching the limit stops only the summary update, which continues at the next hourly run; the download always runs first and its outcome never depends on the summary.
+KSeF also allows 20 metadata queries per hour. An idle hourly run uses 3 of them (one for the purchase download, one for each side of the year summary), the first run after the update up to 9 (up to 11 from 27 December: one download query plus up to 5 year windows per side, up to 4 before that date), and each **Pobierz teraz** 3. The year summary pauses 500 ms before each of its queries, so that KSeF's limit of 8 queries per second is never approached. Reaching the limit stops only the summary update, which continues at the next hourly run; the download always runs first and its outcome never depends on the summary.
 
 Logs go to the unified log; run lines look like `run finished trigger=… status=… saved=…`:
 

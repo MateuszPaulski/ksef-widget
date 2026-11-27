@@ -83,7 +83,7 @@ Sources: the TEST OpenAPI (`https://api-test.ksef.mf.gov.pl/docs/v2/openapi.json
 `index.jsonl` holds gross amounts only, starts at the owner's chosen start date (perhaps later than 1 January) and has no sales at all. Adding net amounts would change a format that real data already uses, and sales would still need a second source.
 
 ### 6.2 On-demand yearly query — rejected
-Re-listing the whole year for both subjects every hour costs up to 10 metadata queries per run against a 20/h limit, competes with the invoice download, and goes against the docs' rule that reporting runs on locally synchronised data.
+Re-listing the whole year for both subjects every hour costs up to 11 metadata queries per run against a 20/h limit, competes with the invoice download, and goes against the docs' rule that reporting runs on locally synchronised data.
 
 ### 6.3 Independent ledger by HWM sync — chosen (O)
 One incremental metadata sync per subject, on the same window, paging and checkpoint code as the download, starting at the beginning of the current year, appending one summary line per invoice to a new file. Idle cost: one query per subject per run. Additive files only; the owner's folder needs no migration.
@@ -118,6 +118,7 @@ One incremental metadata sync per subject, on the same window, paging and checkp
 - (S) Metadata queries per run (one page per window, at most 250 invoices per 90 days):
   - idle hourly run: 1 (download) + 1 + 1 = **3** (was 1);
   - first run after the update, today (27.11): 1 + 4 + 4 = **9**; on 27–31 December: 1 + 5 + 5 = **11**; a fresh folder adds the download's own backfill windows first;
+  - the ledger pauses 500 ms before each of its queries (the first included), because the first run's 9 to 11 queries otherwise go out within about two seconds and drew a per-second 429 on TEST;
   - a 429 with `Retry-After` over 120 s, or a fourth 429, ends the ledger as partial; the download never waits for the ledger.
   - A manual press costs 3 queries; about six presses within an hour of a scheduled run reach 20/h, and then the next download is partial with KSeF's rate-limit reason (notified, resumes next hour). Accepted.
 
