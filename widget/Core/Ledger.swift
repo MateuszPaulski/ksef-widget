@@ -2,6 +2,7 @@ import Foundation
 
 private let maxGroszeMagnitude = 1e10  // PLN: keeps amount × 100 exact in a Double
 private let groszeTolerance = 0.001
+private let ledgerQueryPauseMs = 500  // KSeF allows 8 metadata queries per second; this keeps the ledger at 2
 
 struct LedgerEntry: Decodable, Equatable {
     let ksefNumber: String
@@ -156,8 +157,10 @@ func syncLedger(
 }
 
 /// Never throws; true when both subjects reached the open window and completeAt was written.
+/// Pauses before every metadata query, the first included, so that it stays under KSeF's 8 queries per second.
 func updateLedger(
-    dataDir: URL, query: (Subject) -> Query, now: @Sendable () -> Date, log: @Sendable (String) -> Void
+    dataDir: URL, query: (Subject) -> Query, now: @Sendable () -> Date, sleep: @escaping @Sendable (Int) async -> Void,
+    log: @Sendable (String) -> Void
 ) async -> Bool {
     let ledger: Ledger
     do {
@@ -168,8 +171,13 @@ func updateLedger(
     }
     let year = warsawYear(now())
     for subject in [Subject.buyer, .seller] {
+        let unpaced = query(subject)
+        let paced: Query = { window, pageOffset in
+            await sleep(ledgerQueryPauseMs)
+            return try await unpaced(window, pageOffset)
+        }
         do {
-            if case .partial(let reason) = try await syncLedger(subject, ledger: ledger, query: query(subject), year: year, now: now) {
+            if case .partial(let reason) = try await syncLedger(subject, ledger: ledger, query: paced, year: year, now: now) {
                 log("ledger \(subject.rawValue) stopped: \(reason)")
                 return false
             }

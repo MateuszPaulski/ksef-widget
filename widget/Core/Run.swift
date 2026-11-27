@@ -87,7 +87,7 @@ public func run(_ options: RunOptions) async -> RunSummary {
         case .partial(let reason): (.partial, reason)
         }
         if outcome == .complete {
-            ledgerCompleted = await updateLedger(dataDir: dataDir, query: query, now: now, log: log)
+            ledgerCompleted = await updateLedger(dataDir: dataDir, query: query, now: now, sleep: options.sleep, log: log)
         }
         summary = RunSummary(startedAt: startedAt, status: status, reason: reason, failureKey: nil, saved: saved, checked: nil)
     } catch {

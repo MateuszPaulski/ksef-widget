@@ -204,6 +204,24 @@ final class LedgerTests: XCTestCase {
         XCTAssertEqual(try text(dir.appendingPathComponent("ledger.jsonl")), PINNED_LINE)
     }
 
+    func testNoTwoLedgerQueriesGoOutWithoutAPauseBetweenThem() async throws {
+        let events = Locked<[String]>([])
+        let query: (Subject) -> Query = { _ in
+            { window, _ in
+                events.update { $0.append("query") }
+                return MetadataPage(hasMore: false, isTruncated: false, permanentStorageHwmDate: window.to ?? HWM, invoices: [])
+            }
+        }
+
+        let completed = await updateLedger(
+            dataDir: try temporaryDirectory(), query: query, now: { NOW },
+            sleep: { milliseconds in events.update { $0.append("sleep \(milliseconds)") } }, log: { _ in }
+        )
+
+        XCTAssertTrue(completed)
+        XCTAssertEqual(events.value, Array(repeating: ["sleep 500", "query"], count: 8).flatMap { $0 })
+    }
+
     func testInvalidMetadataStopsBeforeTheCheckpoint() async throws {
         let dir = try temporaryDirectory()
         let ledger = try Ledger.open(dataDir: dir)

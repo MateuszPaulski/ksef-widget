@@ -542,6 +542,21 @@ final class RunTests: XCTestCase {
         XCTAssertEqual(second, 12)
     }
 
+    func testTheLedgerPausesBeforeEveryMetadataQueryItSends() async {
+        let r = rig(invoices: [fakeInvoice(1)])
+
+        _ = await KsefCore.run(r.options)
+        let ledgerQueries = await metadataQueries(r) - 1
+        let first = r.clock.sleeps.filter { $0 == 500 }.count
+        _ = await KsefCore.run(r.options)
+        let idleQueries = await metadataQueries(r) - 1 - ledgerQueries - 1
+
+        XCTAssertEqual(ledgerQueries, 8)
+        XCTAssertEqual(first, ledgerQueries)
+        XCTAssertEqual(idleQueries, 2)
+        XCTAssertEqual(r.clock.sleeps.filter { $0 == 500 }.count, ledgerQueries + idleQueries)
+    }
+
     func testAPartialDownloadSkipsTheLedger() async throws {
         let invoices = [fakeInvoice(1), fakeInvoice(2)]
         let second = invoices[1].metadata.ksefNumber
