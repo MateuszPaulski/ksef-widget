@@ -32,7 +32,7 @@ A personal macOS tool: `KSeF.app`, a native menu-bar app that every hour fetches
 
 - Run the exact command path the owner will be told to run, end to end. When the real target is off-limits (the installed app, production KSeF), run the identical code path against a stand-in (e.g. `install_app` from `scripts/install-app.zsh` on a throwaway app with its own bundle identifier in a scratch directory) and say plainly which part was only exercised on the stand-in.
 - `scripts/build-app.sh` without arguments exits 0 on the final commit: clean build, no warnings in `widget/` sources, hardened runtime on both bundles. Read the whole output, never reduce it to pass/fail lines.
-- `.github/workflows/ci.yml` is green on the pushed commit before the owner is told to merge or install; give the run link, or say it is not green and why.
+- `.github/workflows/ci.yml` runs on pull requests only (when opened and on each update) and is green on the pull request's latest commit before the owner is told to merge or install; give the run link, or say it is not green and why.
 - Say what was not verified: anything only the owner's Mac can show.
 
 ## State
