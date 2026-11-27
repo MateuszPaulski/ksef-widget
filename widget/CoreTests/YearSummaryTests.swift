@@ -17,10 +17,13 @@ final class YearSummaryTests: XCTestCase {
         )
     }
 
-    private func folder(_ entries: [LedgerEntry], completeAt: String? = "2026-11-26T10:00:00.000Z") throws -> URL {
+    private func folder(
+        _ entries: [LedgerEntry], completeAt: String? = "2026-11-26T10:00:00.000Z", skipped: [(Subject, String)] = []
+    ) throws -> URL {
         let dir = try temporaryDirectory()
         let ledger = try Ledger.open(dataDir: dir)
         for entry in entries { try ledger.add(entry) }
+        for (subject, ksefNumber) in skipped { try ledger.skip(subject, ksefNumber) }
         try ledger.writeCheckpoint(.buyer, "2026-11-26T09:00:00.0000000+00:00")
         try ledger.writeCheckpoint(.seller, "2026-11-26T09:00:00.0000000+00:00")
         if let completeAt { try ledger.writeCompleteAt(instant(completeAt)) }
@@ -96,5 +99,45 @@ final class YearSummaryTests: XCTestCase {
         let line = yearSummary(dataDir: dir, ledgerCompleted: true, now: instant("2026-12-31T23:30:00Z"))
 
         XCTAssertEqual(line, YearSummaryLine(text: "2027 · wydatki 5,00 PLN · przychody 0,00 PLN", warning: false))
+    }
+
+    func testSkippedInvoicesOfTheYearAreCounted() throws {
+        let skipped = [
+            (Subject.buyer, "5265877635-20261120-0123456789AB-CD"), (.seller, "5265877635-20261001-0123456789AB-CD"),
+            (.buyer, "5265877635-20251230-0123456789AB-CD"),
+        ]
+        let dir = try folder(yearsLines(), skipped: skipped)
+
+        XCTAssertEqual(
+            yearSummary(dataDir: dir, ledgerCompleted: true, now: NOW),
+            YearSummaryLine(
+                text: "2026 · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR · pominięte: 2", warning: true
+            )
+        )
+        XCTAssertEqual(
+            yearSummary(dataDir: dir, ledgerCompleted: false, now: NOW),
+            YearSummaryLine(
+                text: "2026 (stan na 26.11 11:00) · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR · pominięte: 2",
+                warning: true
+            )
+        )
+    }
+
+    func testASkipFromAnotherYearIsNotCounted() throws {
+        let dir = try folder(yearsLines(), skipped: [(.buyer, "5265877635-20251230-0123456789AB-CD"), (.buyer, "garbage")])
+
+        XCTAssertEqual(
+            yearSummary(dataDir: dir, ledgerCompleted: true, now: NOW),
+            YearSummaryLine(text: "2026 · wydatki 33,60 PLN · przychody 182\(nbsp)400,00 PLN + 1200,00 EUR", warning: false)
+        )
+    }
+
+    func testSkippedInvoicesAreNotAppendedToThePlaceholders() throws {
+        let skipped = [(Subject.buyer, "5265877635-20261120-0123456789AB-CD")]
+
+        XCTAssertEqual(
+            yearSummary(dataDir: try folder([], completeAt: nil, skipped: skipped), ledgerCompleted: false, now: NOW),
+            YearSummaryLine(text: "2026 · podsumowanie w przygotowaniu", warning: true)
+        )
     }
 }

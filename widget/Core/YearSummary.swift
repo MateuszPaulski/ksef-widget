@@ -39,6 +39,8 @@ func yearSummary(dataDir: URL, ledgerCompleted: Bool, now: Date) -> YearSummaryL
         totals[entry.subjectType, default: [:]][entry.currency, default: 0] += net
     }
     let state = ledgerCompleted ? "" : " (stan na \(warsawStamp(KsefTime.date(millis: completedAt))))"
-    let text = "\(year)\(state) · wydatki \(formatTotals(totals[.buyer] ?? [:])) · przychody \(formatTotals(totals[.seller] ?? [:]))"
-    return YearSummaryLine(text: text, warning: !ledgerCompleted)
+    var text = "\(year)\(state) · wydatki \(formatTotals(totals[.buyer] ?? [:])) · przychody \(formatTotals(totals[.seller] ?? [:]))"
+    let skipped = ledger.skipped.filter { $0.ksefNumber.split(separator: "-").dropFirst().first?.hasPrefix("\(year)") == true }.count
+    if skipped > 0 { text += " · pominięte: \(skipped)" }
+    return YearSummaryLine(text: text, warning: !ledgerCompleted || skipped > 0)
 }

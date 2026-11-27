@@ -608,6 +608,39 @@ final class RunTests: XCTestCase {
         XCTAssertEqual(r.notifications.value.count, 1)
     }
 
+    private func unsummable(_ n: Int) -> FakeInvoice {
+        var metadata = fakeInvoice(n).metadata
+        metadata.netAmount = nil
+        return FakeInvoice(metadata: metadata, xml: Data())
+    }
+
+    func testAnInvoiceTheLedgerCannotSumLeavesTheRunCompleteAndIsCounted() async throws {
+        let baseline = rig(invoices: [fakeInvoice(1)], salesInvoices: [fakeInvoice(7)])
+        let r = rig(invoices: [fakeInvoice(1)], salesInvoices: [fakeInvoice(7), unsummable(8)])
+        _ = await KsefCore.run(baseline.options)
+
+        let summary = await KsefCore.run(r.options)
+
+        XCTAssertEqual(summary.status, .complete)
+        XCTAssertEqual(summary.saved.count, 1)
+        XCTAssertEqual(r.notifications.value.map(\.title), baseline.notifications.value.map(\.title))
+        XCTAssertEqual(r.notifications.value.map(\.message), baseline.notifications.value.map(\.message))
+        XCTAssertEqual(try text(reportURL(r.dataDir)), try text(reportURL(baseline.dataDir)))
+        XCTAssertEqual(try ledgerLines(r.dataDir).count, 2)
+        let skipped = "5265877635-20261120-000008123456-AB"
+        let ledgerState = try jsonObject(r.dataDir.appendingPathComponent("ledger-state.json"))
+        XCTAssertNotNil(ledgerState["completeAt"])
+        XCTAssertEqual(
+            ledgerState["skipped"] as? NSArray, [["subjectType": "Subject1", "ksefNumber": skipped]] as NSArray
+        )
+        XCTAssertEqual(
+            try yearSummary(r.snapshotURL),
+            ["text": "2026 · wydatki 100,00 PLN · przychody 700,00 PLN · pominięte: 1", "warning": true] as NSDictionary
+        )
+        let reason = "Nieprawidłowe metadane faktury \"\(skipped)\" do podsumowania roku"
+        XCTAssertEqual(r.logs.value.filter { $0.hasPrefix("ledger") }, ["ledger Subject1 skipped \"\(skipped)\": \(reason)"])
+    }
+
     func testNoSummaryFromAFolderOfAnotherIdentity() async throws {
         let r = rig(invoices: [fakeInvoice(1)])
         try writeIdentity(r.dataDir, nip: "1111111111", environment: "test")

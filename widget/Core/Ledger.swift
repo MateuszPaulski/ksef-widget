@@ -36,13 +36,20 @@ func ledgerEntry(_ invoice: InvoiceMetadata, subject: Subject) throws -> LedgerE
     )
 }
 
+/// An invoice whose metadata the ledger cannot sum; recorded in ledger-state.json so that it is neither retried nor logged again.
+struct SkippedInvoice: Decodable, Equatable {
+    let subjectType: Subject
+    let ksefNumber: String
+}
+
 private struct LedgerState: Decodable {
     let buyer: String?
     let seller: String?
     let completeAt: String?
+    let skipped: [SkippedInvoice]?
 
     private enum CodingKeys: String, CodingKey {
-        case buyer = "Subject2", seller = "Subject1", completeAt
+        case buyer = "Subject2", seller = "Subject1", completeAt, skipped
     }
 }
 
@@ -53,13 +60,18 @@ final class Ledger {
     private var known: Set<String>
     private(set) var entries: [LedgerEntry]
     private(set) var completeAt: String?
+    private(set) var skipped: [SkippedInvoice]
 
-    private init(dataDir: URL, entries: [LedgerEntry], checkpoints: [Subject: String], completeAt: String?) {
+    private init(
+        dataDir: URL, entries: [LedgerEntry], checkpoints: [Subject: String], completeAt: String?, skipped: [SkippedInvoice]
+    ) {
         self.dataDir = dataDir
         self.entries = entries
         self.checkpoints = checkpoints
         self.completeAt = completeAt
+        self.skipped = skipped
         known = Set(entries.map { Self.key($0.subjectType, $0.ksefNumber) })
+            .union(skipped.map { Self.key($0.subjectType, $0.ksefNumber) })
     }
 
     static func open(dataDir: URL) throws -> Ledger {
@@ -76,6 +88,7 @@ final class Ledger {
         }
         var checkpoints: [Subject: String] = [:]
         var completeAt: String?
+        var skipped: [SkippedInvoice] = []
         if let data = try readIfExists(dataDir.appendingPathComponent("ledger-state.json")) {
             guard let state = try? JSONDecoder().decode(LedgerState.self, from: data) else {
                 throw KsefError("Uszkodzony plik ledger-state.json")
@@ -83,8 +96,9 @@ final class Ledger {
             checkpoints[.buyer] = state.buyer
             checkpoints[.seller] = state.seller
             completeAt = state.completeAt
+            skipped = state.skipped ?? []
         }
-        return Ledger(dataDir: dataDir, entries: entries, checkpoints: checkpoints, completeAt: completeAt)
+        return Ledger(dataDir: dataDir, entries: entries, checkpoints: checkpoints, completeAt: completeAt, skipped: skipped)
     }
 
     func checkpoint(_ subject: Subject) -> String? { checkpoints[subject] }
@@ -111,22 +125,35 @@ final class Ledger {
     func writeCheckpoint(_ subject: Subject, _ value: String) throws {
         var updated = checkpoints
         updated[subject] = value
-        try writeState(checkpoints: updated, completeAt: completeAt)
+        try writeState(checkpoints: updated, completeAt: completeAt, skipped: skipped)
         checkpoints = updated
     }
 
     func writeCompleteAt(_ instant: Date) throws {
         let value = KsefTime.iso(instant)
-        try writeState(checkpoints: checkpoints, completeAt: value)
+        try writeState(checkpoints: checkpoints, completeAt: value, skipped: skipped)
         completeAt = value
     }
 
-    private func writeState(checkpoints: [Subject: String], completeAt: String?) throws {
+    func skip(_ subject: Subject, _ ksefNumber: String) throws {
+        let updated = skipped + [SkippedInvoice(subjectType: subject, ksefNumber: ksefNumber)]
+        try writeState(checkpoints: checkpoints, completeAt: completeAt, skipped: updated)
+        skipped = updated
+        known.insert(Self.key(subject, ksefNumber))
+    }
+
+    private func writeState(checkpoints: [Subject: String], completeAt: String?, skipped: [SkippedInvoice]) throws {
         var fields: [(String, JSONValue)] = []
         for subject in [Subject.buyer, .seller] {
             if let checkpoint = checkpoints[subject] { fields.append((subject.rawValue, .string(checkpoint))) }
         }
         if let completeAt { fields.append(("completeAt", .string(completeAt))) }
+        if !skipped.isEmpty {
+            let items = skipped.map {
+                JSONValue.object([("subjectType", .string($0.subjectType.rawValue)), ("ksefNumber", .string($0.ksefNumber))])
+            }
+            fields.append(("skipped", .array(items)))
+        }
         try writeAtomic(Data((JSONValue.object(fields).compact() + "\n").utf8), to: dataDir.appendingPathComponent("ledger-state.json"))
     }
 
@@ -135,8 +162,10 @@ final class Ledger {
 
 func yearStart(_ year: Int) -> String { "\(year)-01-01T00:00:00+01:00" }
 
+/// An invoice whose metadata cannot be summed is recorded as skipped and logged, unless its KSeF number is itself
+/// malformed: that cannot be recorded safely, so the error stops the ledger.
 func syncLedger(
-    _ subject: Subject, ledger: Ledger, query: Query, year: Int, now: @Sendable () -> Date
+    _ subject: Subject, ledger: Ledger, query: Query, year: Int, now: @Sendable () -> Date, log: @Sendable (String) -> Void
 ) async throws -> SyncOutcome {
     let start = yearStart(year)
     var from = start
@@ -148,7 +177,15 @@ func syncLedger(
         from: from, query: query, now: now,
         process: { invoices in
             for invoice in invoices where !ledger.has(subject, invoice.ksefNumber) {
-                try ledger.add(ledgerEntry(invoice, subject: subject))
+                let entry: LedgerEntry
+                do {
+                    entry = try ledgerEntry(invoice, subject: subject)
+                } catch let error where invoice.ksefNumber.wholeMatch(of: ksefNumberPattern) != nil {
+                    try ledger.skip(subject, invoice.ksefNumber)
+                    log("ledger \(subject.rawValue) skipped \(quoted(invoice.ksefNumber)): \(errorMessage(error))")
+                    continue
+                }
+                try ledger.add(entry)
             }
             return nil
         },
@@ -177,7 +214,7 @@ func updateLedger(
             return try await unpaced(window, pageOffset)
         }
         do {
-            if case .partial(let reason) = try await syncLedger(subject, ledger: ledger, query: paced, year: year, now: now) {
+            if case .partial(let reason) = try await syncLedger(subject, ledger: ledger, query: paced, year: year, now: now, log: log) {
                 log("ledger \(subject.rawValue) stopped: \(reason)")
                 return false
             }

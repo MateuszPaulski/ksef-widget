@@ -4,6 +4,8 @@ import XCTest
 private let NOW = instant("2026-11-26T08:00:00Z")
 private let HWM = "2026-11-26T07:00:00.1234567+00:00"
 private let NUMBER = "5265877635-20261120-0123456789AB-CD"
+private let SKIPPED = "5265877635-20261120-0123456789AB-CE"
+private let LATER = "5265877635-20261120-0123456789AB-CF"
 private let PINNED_LINE =
     "{\"ksefNumber\":\"\(NUMBER)\",\"subjectType\":\"Subject2\",\"issueDate\":\"2026-11-20\",\"invoiceType\":\"Vat\",\"currency\":\"PLN\","
     + "\"netAmount\":43.6,\"grossAmount\":53.63,\"vatAmount\":10.03}\n"
@@ -33,8 +35,10 @@ private func queries(
 }
 
 final class LedgerTests: XCTestCase {
-    private func sync(_ subject: Subject, _ ledger: Ledger, _ query: @escaping Query) async throws -> SyncOutcome {
-        try await syncLedger(subject, ledger: ledger, query: query, year: 2026, now: { NOW })
+    private func sync(
+        _ subject: Subject, _ ledger: Ledger, _ query: @escaping Query, log: @escaping @Sendable (String) -> Void = { _ in }
+    ) async throws -> SyncOutcome {
+        try await syncLedger(subject, ledger: ledger, query: query, year: 2026, now: { NOW }, log: log)
     }
 
     func testGroszeAreExact() {
@@ -222,16 +226,99 @@ final class LedgerTests: XCTestCase {
         XCTAssertEqual(events.value, Array(repeating: ["sleep 500", "query"], count: 8).flatMap { $0 })
     }
 
-    func testInvalidMetadataStopsBeforeTheCheckpoint() async throws {
+    func testInvalidMetadataOfAMalformedNumberStopsBeforeTheCheckpoint() async throws {
         let dir = try temporaryDirectory()
         let ledger = try Ledger.open(dataDir: dir)
-        let invoice = metadata(net: nil)
+        let invoice = metadata("x", net: nil)
 
         let message = await thrownMessage { try await self.sync(.buyer, ledger, queries(Locked([])) { _ in [invoice] }) }
 
-        XCTAssertEqual(message, "Nieprawidłowe metadane faktury \"\(NUMBER)\" do podsumowania roku")
+        XCTAssertEqual(message, "Nieprawidłowe metadane faktury \"x\" do podsumowania roku")
         XCTAssertFalse(exists(dir.appendingPathComponent("ledger.jsonl")))
         XCTAssertFalse(exists(dir.appendingPathComponent("ledger-state.json")))
         XCTAssertNil(ledger.checkpoint(.buyer))
+    }
+
+    private var skippedState: String {
+        "\"skipped\":[{\"subjectType\":\"Subject2\",\"ksefNumber\":\"\(SKIPPED)\"}]"
+    }
+
+    func testAnInvoiceItCannotSumIsSkippedRecordedAndLoggedOnce() async throws {
+        let dir = try temporaryDirectory()
+        let invoices = [metadata(), metadata(SKIPPED, net: nil), metadata(LATER)]
+        let listsEverywhere = { @Sendable (_: Window) in invoices }
+        let logs = Locked<[String]>([])
+        let log: @Sendable (String) -> Void = { line in logs.update { $0.append(line) } }
+        let ledger = try Ledger.open(dataDir: dir)
+
+        let outcome = try await sync(.buyer, ledger, queries(Locked([]), invoices: listsEverywhere), log: log)
+
+        XCTAssertEqual(outcome, .complete)
+        XCTAssertEqual(ledger.entries.map(\.ksefNumber), [NUMBER, LATER])
+        XCTAssertEqual(ledger.checkpoint(.buyer), HWM)
+        XCTAssertEqual(ledger.skipped, [SkippedInvoice(subjectType: .buyer, ksefNumber: SKIPPED)])
+        let state = try text(dir.appendingPathComponent("ledger-state.json"))
+        XCTAssertEqual(state, "{\"Subject2\":\"\(HWM)\",\(skippedState)}\n")
+        let reason = "Nieprawidłowe metadane faktury \"\(SKIPPED)\" do podsumowania roku"
+        XCTAssertEqual(logs.value, ["ledger Subject2 skipped \"\(SKIPPED)\": \(reason)"])
+
+        let again = try Ledger.open(dataDir: dir)
+        _ = try await sync(.buyer, again, queries(Locked([]), invoices: listsEverywhere), log: log)
+
+        XCTAssertEqual(again.skipped.count, 1)
+        XCTAssertEqual(again.entries.count, 2)
+        XCTAssertEqual(try text(dir.appendingPathComponent("ledger-state.json")), state)
+        XCTAssertEqual(logs.value.count, 1)
+    }
+
+    func testASkipIsRecordedEvenWhenNoCheckpointIsWritten() async throws {
+        let dir = try temporaryDirectory()
+        let invoice = metadata(SKIPPED, net: nil)
+        let query: Query = { _, _ in
+            MetadataPage(hasMore: false, isTruncated: false, permanentStorageHwmDate: nil, invoices: [invoice])
+        }
+
+        let ledger = try Ledger.open(dataDir: dir)
+        try ledger.writeCheckpoint(.buyer, "2026-11-20T00:00:00.000Z")
+
+        let outcome = try await sync(.buyer, ledger, query)
+
+        XCTAssertEqual(outcome, .complete)
+        XCTAssertEqual(
+            try text(dir.appendingPathComponent("ledger-state.json")), "{\"Subject2\":\"2026-11-20T00:00:00.000Z\",\(skippedState)}\n"
+        )
+    }
+
+    func testTheSameNumberOnTheOtherSubjectIsSkippedSeparately() async throws {
+        let ledger = try Ledger.open(dataDir: try temporaryDirectory())
+        let invoice = metadata(SKIPPED, net: nil)
+        let listsEverywhere = { @Sendable (_: Window) in [invoice] }
+
+        _ = try await sync(.buyer, ledger, queries(Locked([]), invoices: listsEverywhere))
+        _ = try await sync(.seller, ledger, queries(Locked([]), invoices: listsEverywhere))
+
+        XCTAssertEqual(ledger.skipped.map(\.subjectType), [.buyer, .seller])
+    }
+
+    func testStateWritesSkippedLastAndKeepsItAcrossRewrites() throws {
+        let dir = try temporaryDirectory()
+        let ledger = try Ledger.open(dataDir: dir)
+        try ledger.skip(.buyer, SKIPPED)
+        try ledger.skip(.seller, LATER)
+
+        try ledger.writeCheckpoint(.seller, "b")
+        try ledger.writeCheckpoint(.buyer, "a")
+        try ledger.writeCompleteAt(instant("2026-11-26T13:00:41.123Z"))
+
+        XCTAssertEqual(
+            try text(dir.appendingPathComponent("ledger-state.json")),
+            "{\"Subject2\":\"a\",\"Subject1\":\"b\",\"completeAt\":\"2026-11-26T13:00:41.123Z\","
+                + "\"skipped\":[{\"subjectType\":\"Subject2\",\"ksefNumber\":\"\(SKIPPED)\"},"
+                + "{\"subjectType\":\"Subject1\",\"ksefNumber\":\"\(LATER)\"}]}\n"
+        )
+        let reopened = try Ledger.open(dataDir: dir)
+        XCTAssertEqual(reopened.skipped, ledger.skipped)
+        XCTAssertTrue(reopened.has(.buyer, SKIPPED))
+        XCTAssertFalse(reopened.has(.seller, SKIPPED))
     }
 }

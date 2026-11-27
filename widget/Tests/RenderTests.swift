@@ -74,6 +74,12 @@ final class RenderTests: XCTestCase {
         try render(Fixtures.snapshot(yearSummary: summary), isLarge: false, name: "medium-summary-pending")
     }
 
+    func testRenderMediumSummarySkipped() throws {
+        let summary = Snapshot.YearSummary(
+            text: "2026 · wydatki 48\u{a0}210,55 PLN · przychody 182\u{a0}400,00 PLN · pominięte: 1", warning: true)
+        try render(Fixtures.snapshot(yearSummary: summary), isLarge: false, name: "medium-summary-skipped")
+    }
+
     private static let plainSummary = Snapshot.YearSummary(
         text: "2026 · wydatki 48\u{a0}210,55 PLN · przychody 182\u{a0}400,00 PLN", warning: false)
 
