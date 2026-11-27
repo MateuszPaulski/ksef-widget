@@ -20,6 +20,7 @@ struct WidgetSnapshot: Equatable {
     let today: String
     let savedToday: Int
     let invoices: [WidgetInvoice]
+    let yearSummary: YearSummaryLine?
 }
 
 func widgetInvoice(_ entry: IndexEntry, _ environment: KsefEnvironment) -> WidgetInvoice {
@@ -35,14 +36,16 @@ func widgetInvoice(_ entry: IndexEntry, _ environment: KsefEnvironment) -> Widge
 }
 
 /// `invoices` are in index order, oldest first.
-func buildSnapshot(status: RunStatus, reason: String?, failureKey: String?, invoices: [WidgetInvoice], now: Date) -> WidgetSnapshot {
+func buildSnapshot(
+    status: RunStatus, reason: String?, failureKey: String?, invoices: [WidgetInvoice], now: Date, yearSummary: YearSummaryLine? = nil
+) -> WidgetSnapshot {
     let today = warsawDay(now)
     let savedToday = invoices.filter { invoice in
         KsefTime.millis(invoice.savedAt).map { warsawDay(KsefTime.date(millis: $0)) == today } ?? false
     }.count
     return WidgetSnapshot(
         updatedAt: KsefTime.iso(now), status: status, reason: reason, failureKey: failureKey, today: today,
-        savedToday: savedToday, invoices: Array(invoices.suffix(snapshotInvoices).reversed())
+        savedToday: savedToday, invoices: Array(invoices.suffix(snapshotInvoices).reversed()), yearSummary: yearSummary
     )
 }
 
@@ -64,6 +67,9 @@ extension WidgetSnapshot {
                 ("viewUrl", .string(invoice.viewUrl)),
             ])
         })))
+        if let yearSummary {
+            fields.append(("yearSummary", .object([("text", .string(yearSummary.text)), ("warning", .bool(yearSummary.warning))])))
+        }
         return .object(fields)
     }
 }

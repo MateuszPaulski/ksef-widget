@@ -1,0 +1,44 @@
+import Foundation
+
+struct YearSummaryLine: Equatable {
+    let text: String
+    let warning: Bool
+}
+
+func warsawYear(_ date: Date) -> Int {
+    Int(warsawDay(date).prefix(4))!
+}
+
+/// PLN always, then every other currency with a non-zero sum, codes ascending.
+func formatTotals(_ grosze: [String: Int64]) -> String {
+    var text = formatAmount(Double(grosze["PLN", default: 0]) / 100, "PLN")
+    for (currency, sum) in grosze.sorted(by: { $0.key < $1.key }) where currency != "PLN" && sum != 0 {
+        text += " + " + formatAmount(Double(sum) / 100, currency)
+    }
+    return text
+}
+
+/// For the Warsaw year of `now`; `ledgerCompleted` = this run brought both subjects up to date.
+func yearSummary(dataDir: URL, ledgerCompleted: Bool, now: Date) -> YearSummaryLine {
+    let year = warsawYear(now)
+    let ledger: Ledger
+    do {
+        ledger = try Ledger.open(dataDir: dataDir)
+    } catch {
+        return YearSummaryLine(text: "\(year) · podsumowanie niedostępne: \(errorMessage(error))", warning: true)
+    }
+    guard let completedAt = ledger.completeAt.flatMap(KsefTime.millis) else {
+        return YearSummaryLine(text: "\(year) · podsumowanie w przygotowaniu", warning: true)
+    }
+
+    var totals: [Subject: [String: Int64]] = [:]
+    for entry in ledger.entries where entry.issueDate.hasPrefix("\(year)-") {
+        guard let net = grosze(entry.netAmount) else {
+            return YearSummaryLine(text: "\(year) · podsumowanie niedostępne: Uszkodzony plik ledger.jsonl", warning: true)
+        }
+        totals[entry.subjectType, default: [:]][entry.currency, default: 0] += net
+    }
+    let state = ledgerCompleted ? "" : " (stan na \(warsawStamp(KsefTime.date(millis: completedAt))))"
+    let text = "\(year)\(state) · wydatki \(formatTotals(totals[.buyer] ?? [:])) · przychody \(formatTotals(totals[.seller] ?? [:]))"
+    return YearSummaryLine(text: text, warning: !ledgerCompleted)
+}

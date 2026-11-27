@@ -143,6 +143,31 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), golden.snapshotJson)
     }
 
+    func testWritesTheYearSummaryAfterTheInvoices() throws {
+        let url = try snapshotFile()
+
+        try writeSnapshot(
+            buildSnapshot(
+                status: .complete, reason: nil, failureKey: nil, invoices: [], now: now,
+                yearSummary: YearSummaryLine(text: "2026 · wydatki 43,60 PLN · przychody 0,00 PLN", warning: false)
+            ),
+            to: url
+        )
+
+        let written = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertTrue(written.hasSuffix(
+            """
+              "invoices": [],
+              "yearSummary": {
+                "text": "2026 · wydatki 43,60 PLN · przychody 0,00 PLN",
+                "warning": false
+              }
+            }
+
+            """
+        ))
+    }
+
     func testTheWidgetCanReadIt() throws {
         let url = try snapshotFile()
         try writeSnapshot(

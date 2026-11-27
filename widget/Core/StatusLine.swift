@@ -43,7 +43,7 @@ private func outcome(_ status: SnapshotStatus) -> String {
 }
 
 /// `DD.MM HH:mm` in Warsaw.
-private func warsawStamp(_ date: Date) -> String {
+func warsawStamp(_ date: Date) -> String {
     let day = warsawDay(date)
     return "\(day.suffix(2)).\(day.dropFirst(5).prefix(2)) \(warsawTime(date).prefix(5))"
 }
